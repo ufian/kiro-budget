@@ -224,6 +224,9 @@ class PDFParser(FileParser):
             # Parse amount
             amount = self.transformer.normalize_amount(amount_str.strip())
             
+            # CRITICAL FIX: Convert credit card statement signs to banking convention
+            amount = self._convert_credit_card_amount_to_banking_convention(amount, description)
+            
             # Parse balance if available
             balance = None
             if balance_str and balance_str.strip():
@@ -284,6 +287,16 @@ class PDFParser(FileParser):
                 
                 date = self.transformer.normalize_date(date_str)
                 amount = self.transformer.normalize_amount(amount_str)
+                
+                # CRITICAL FIX: Convert credit card statement signs to banking convention
+                # In credit card statements:
+                # - Credits (payments, refunds) are shown as negative (reduce balance owed)
+                # - Debits (purchases) are shown as positive (increase balance owed)
+                # But in banking convention:
+                # - Credits should be positive (money coming in)
+                # - Debits should be negative (money going out)
+                amount = self._convert_credit_card_amount_to_banking_convention(amount, description)
+                
                 description = self.transformer.clean_description(description)
                 account = self.transformer.extract_account(file_path, {})
                 
@@ -331,6 +344,9 @@ class PDFParser(FileParser):
             description = re.sub(re.escape(amount_str), '', description)
             description = self.transformer.clean_description(description)
             
+            # CRITICAL FIX: Convert credit card statement signs to banking convention
+            amount = self._convert_credit_card_amount_to_banking_convention(amount, description)
+            
             # Extract account info
             account = self.transformer.extract_account(file_path, {})
             
@@ -345,6 +361,56 @@ class PDFParser(FileParser):
         except Exception as e:
             logger.debug(f"Error parsing text line: {e}")
             return None
+    
+    def _convert_credit_card_amount_to_banking_convention(self, amount: Decimal, description: str) -> Decimal:
+        """
+        Convert credit card statement amounts to banking convention
+        
+        Credit card statements show:
+        - Credits (payments, refunds) as negative (they reduce balance owed)
+        - Debits (purchases) as positive (they increase balance owed)
+        
+        Banking convention shows:
+        - Credits as positive (money coming in)
+        - Debits as negative (money going out)
+        
+        So we need to invert the signs for credit card statements.
+        """
+        # Detect if this is likely a credit/payment vs a debit/purchase
+        description_lower = description.lower() if description else ""
+        
+        # Keywords that indicate credits (payments, refunds, returns)
+        credit_keywords = [
+            'payment', 'thank you', 'refund', 'return', 'credit', 'adjustment',
+            'cashback', 'reward', 'rebate', 'amazon.com amzn.com/bill'  # Amazon refunds
+        ]
+        
+        # Keywords that indicate debits (purchases, fees, interest)
+        debit_keywords = [
+            'purchase', 'fee', 'interest', 'charge', 'penalty', 'late',
+            'amazon.com*', 'amazon mktpl*'  # Amazon purchases (different from refunds)
+        ]
+        
+        is_likely_credit = any(keyword in description_lower for keyword in credit_keywords)
+        is_likely_debit = any(keyword in description_lower for keyword in debit_keywords)
+        
+        # If we can't determine from description, use the sign as a hint
+        # In credit card statements:
+        # - Negative amounts are usually credits (payments/refunds)
+        # - Positive amounts are usually debits (purchases)
+        if not is_likely_credit and not is_likely_debit:
+            if amount < 0:
+                is_likely_credit = True
+            else:
+                is_likely_debit = True
+        
+        # Convert to banking convention
+        if is_likely_credit:
+            # Credits should be positive in banking convention
+            return abs(amount)
+        else:
+            # Debits should be negative in banking convention
+            return -abs(amount)
     
     def extract_tables_from_all_pages(self, pdf_path: str) -> List[List[Dict]]:
         """Extract transaction tables from all pages of PDF"""

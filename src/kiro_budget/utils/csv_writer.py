@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from ..models.core import Transaction, ParserConfig, ProcessingResult
+from .duplicate_detector import DuplicateDetector, TransactionMerger
 
 
 class CSVWriter:
@@ -25,6 +26,8 @@ class CSVWriter:
     
     def __init__(self, config: ParserConfig):
         self.config = config
+        self.duplicate_detector = DuplicateDetector()
+        self.transaction_merger = TransactionMerger(self.duplicate_detector)
     
     def write_transactions(self, transactions: List[Transaction], output_path: str) -> bool:
         """
@@ -162,13 +165,83 @@ class CSVWriter:
     
     def write_multiple_files(self, transactions_by_file: Dict[str, List[Transaction]]) -> Dict[str, ProcessingResult]:
         """
-        Write multiple transaction files with proper organization
+        Write multiple transaction files with proper organization and duplicate detection
         
         Args:
             transactions_by_file: Dictionary mapping source file paths to transaction lists
             
         Returns:
             Dictionary mapping source file paths to ProcessingResult objects
+        """
+        # First, identify accounts that appear in multiple files
+        mergeable_accounts = self.transaction_merger.identify_mergeable_accounts(transactions_by_file)
+        
+        if mergeable_accounts:
+            # Handle merging for accounts with duplicates
+            return self._write_with_merging(transactions_by_file, mergeable_accounts)
+        else:
+            # No merging needed, use original logic
+            return self._write_without_merging(transactions_by_file)
+    
+    def _write_with_merging(self, transactions_by_file: Dict[str, List[Transaction]], 
+                           mergeable_accounts: Dict[Tuple[str, str], List[str]]) -> Dict[str, ProcessingResult]:
+        """
+        Write files with duplicate detection and merging
+        """
+        results = {}
+        processed_files = set()
+        
+        # Process mergeable accounts
+        for (account, institution), source_files in mergeable_accounts.items():
+            # Merge transactions for this account
+            merged_transactions, merge_stats = self.transaction_merger.merge_files_for_account(
+                transactions_by_file, account, institution
+            )
+            
+            if not merged_transactions:
+                continue
+            
+            # Generate output path for merged data
+            output_path = self.generate_output_path(merged_transactions, source_files[0])
+            
+            # Write merged transactions
+            start_time = datetime.now()
+            success = self.write_transactions(merged_transactions, output_path)
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds()
+            
+            # Create results for all source files involved in the merge
+            for source_file in source_files:
+                original_count = len([t for t in transactions_by_file[source_file] 
+                                    if t.account == account and t.institution.lower() == institution.lower()])
+                
+                warnings = []
+                if merge_stats['duplicates_removed'] > 0:
+                    warnings.append(f"Removed {merge_stats['duplicates_removed']} duplicate transactions during merge")
+                
+                results[source_file] = ProcessingResult(
+                    file_path=source_file,
+                    institution=institution,
+                    transactions_count=original_count,
+                    output_file=output_path if success else '',
+                    processing_time=processing_time / len(source_files),  # Distribute time
+                    errors=[] if success else ['Failed to write merged CSV file'],
+                    warnings=warnings,
+                    success=success
+                )
+                processed_files.add(source_file)
+        
+        # Process remaining files that weren't merged
+        remaining_files = {k: v for k, v in transactions_by_file.items() if k not in processed_files}
+        if remaining_files:
+            remaining_results = self._write_without_merging(remaining_files)
+            results.update(remaining_results)
+        
+        return results
+    
+    def _write_without_merging(self, transactions_by_file: Dict[str, List[Transaction]]) -> Dict[str, ProcessingResult]:
+        """
+        Write files without merging (original logic)
         """
         results = {}
         output_paths = self.organize_output_by_institution(transactions_by_file)

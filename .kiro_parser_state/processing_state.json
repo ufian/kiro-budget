@@ -1,24 +1,24 @@
 {
-  "last_updated": "2025-12-29T21:32:49.187320",
+  "last_updated": "2025-12-29T22:51:26.855131",
   "processed_files": {
     "raw/chase/20251104-statements-8147-.pdf": {
       "file_path": "raw/chase/20251104-statements-8147-.pdf",
       "file_hash": "924d8c8203c9e45e4f4ab213508e9ec9",
-      "last_processed": "2025-12-29T21:32:49.145804",
-      "output_file": "data/chase/chase_8147_20251003_20251102.csv",
+      "last_processed": "2025-12-29T22:51:26.854828",
+      "output_file": "data/chase/chase_8147_20251005_20251103.csv",
       "transaction_count": 65,
       "success": true,
-      "processing_time": 0.554750919342041,
+      "processing_time": 0.558001290939331,
       "file_size": 279547
     },
     "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX": {
       "file_path": "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX",
       "file_hash": "cd040936726e504e73d0d7709ec404ee",
-      "last_processed": "2025-12-29T21:32:49.162871",
+      "last_processed": "2025-12-29T22:51:26.855127",
       "output_file": "data/chase/chase_8147_20251005_20251103.csv",
       "transaction_count": 70,
       "success": true,
-      "processing_time": 0.016644954681396484,
+      "processing_time": 0.015648614547729492,
       "file_size": 11164
     },
     "raw/firsttech/Misha.qfx": {

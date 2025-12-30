@@ -111,30 +111,41 @@ class FinancialDataParserCLI:
             if skipped_count > 0:
                 self.error_handler.log_info(f"Skipping {skipped_count} previously processed files")
         
-        # Process each file with progress reporting
-        processed_count = 0
-        successful_count = 0
-        total_files = len(files_to_process)
-        
-        for i, file_path in enumerate(files_to_process, 1):
-            try:
-                # Progress reporting
-                self._report_progress(i, total_files, file_path)
-                
-                result = self._process_single_file(file_path)
+        # Check if we should use batch processing with duplicate detection
+        if len(files_to_process) > 1:
+            # Use batch processing with duplicate detection
+            results = self._process_files_with_merging(files_to_process)
+            processed_count = len([r for r in results.values() if r.success or not r.success])
+            successful_count = len([r for r in results.values() if r.success])
+            
+            # Record all results
+            for result in results.values():
                 self.processing_tracker.record_processing_result(result)
-                
-                processed_count += 1
-                if result.success:
-                    successful_count += 1
+        else:
+            # Process single file with original logic
+            processed_count = 0
+            successful_count = 0
+            total_files = len(files_to_process)
+            
+            for i, file_path in enumerate(files_to_process, 1):
+                try:
+                    # Progress reporting
+                    self._report_progress(i, total_files, file_path)
                     
-            except Exception as e:
-                self.error_handler.log_error(
-                    f"Unexpected error processing {file_path}: {str(e)}",
-                    "PROCESSING_ERROR",
-                    file_path=file_path,
-                    exception=e
-                )
+                    result = self._process_single_file(file_path)
+                    self.processing_tracker.record_processing_result(result)
+                    
+                    processed_count += 1
+                    if result.success:
+                        successful_count += 1
+                        
+                except Exception as e:
+                    self.error_handler.log_error(
+                        f"Unexpected error processing {file_path}: {str(e)}",
+                        "PROCESSING_ERROR",
+                        file_path=file_path,
+                        exception=e
+                    )
         
         # Generate summary
         summary = self.processing_tracker.generate_batch_summary()
@@ -298,6 +309,138 @@ class FinancialDataParserCLI:
                 warnings=warnings,
                 success=False
             )
+    
+    def _process_files_with_merging(self, file_paths: List[str]) -> Dict[str, 'ProcessingResult']:
+        """
+        Process multiple files with duplicate detection and merging
+        
+        Args:
+            file_paths: List of file paths to process
+            
+        Returns:
+            Dictionary mapping file paths to ProcessingResult objects
+        """
+        from .models.core import ProcessingResult
+        import time
+        
+        # Parse all files first
+        transactions_by_file = {}
+        parse_results = {}
+        
+        total_files = len(file_paths)
+        
+        for i, file_path in enumerate(file_paths, 1):
+            self._report_progress(i, total_files, file_path)
+            
+            start_time = time.time()
+            errors = []
+            warnings = []
+            transactions = []
+            
+            try:
+                # Detect format and get parser
+                parser = self.parser_factory.get_parser_for_file(file_path)
+                if not parser:
+                    error_msg = f"No suitable parser found for file: {file_path}"
+                    errors.append(error_msg)
+                    self.error_handler.log_error(
+                        error_msg,
+                        "PARSER_NOT_FOUND",
+                        file_path=file_path
+                    )
+                else:
+                    # Parse the file
+                    try:
+                        transactions = parser.parse(file_path)
+                        self.error_handler.log_info(f"Parsed {len(transactions)} transactions from {file_path}")
+                        
+                        # Validate transactions
+                        validated_transactions = []
+                        for transaction in transactions:
+                            validation_errors = self.validation_engine.validate_transaction(transaction)
+                            if validation_errors:
+                                warnings.extend(validation_errors)
+                            else:
+                                validated_transactions.append(transaction)
+                        
+                        transactions = validated_transactions
+                        
+                    except Exception as e:
+                        error_msg = f"Failed to parse file {file_path}: {str(e)}"
+                        errors.append(error_msg)
+                        self.error_handler.log_error(
+                            error_msg,
+                            "PARSING_ERROR",
+                            file_path=file_path,
+                            exception=e
+                        )
+                
+                # Store results
+                transactions_by_file[file_path] = transactions
+                parse_results[file_path] = {
+                    'errors': errors,
+                    'warnings': warnings,
+                    'parsing_time': time.time() - start_time,
+                    'transaction_count': len(transactions)
+                }
+                
+            except Exception as e:
+                error_msg = f"Unexpected error processing {file_path}: {str(e)}"
+                errors.append(error_msg)
+                self.error_handler.log_error(
+                    error_msg,
+                    "PROCESSING_ERROR",
+                    file_path=file_path,
+                    exception=e
+                )
+                
+                transactions_by_file[file_path] = []
+                parse_results[file_path] = {
+                    'errors': errors,
+                    'warnings': warnings,
+                    'parsing_time': time.time() - start_time,
+                    'transaction_count': 0
+                }
+        
+        # Now write with duplicate detection and merging
+        write_results = self.csv_writer.write_multiple_files(transactions_by_file)
+        
+        # Combine parse and write results
+        final_results = {}
+        for file_path in file_paths:
+            parse_result = parse_results[file_path]
+            write_result = write_results.get(file_path)
+            
+            if write_result:
+                # Merge results
+                all_errors = parse_result['errors'] + write_result.errors
+                all_warnings = parse_result['warnings'] + write_result.warnings
+                total_time = parse_result['parsing_time'] + write_result.processing_time
+                
+                final_results[file_path] = ProcessingResult(
+                    file_path=file_path,
+                    institution=write_result.institution,
+                    transactions_count=write_result.transactions_count,
+                    output_file=write_result.output_file,
+                    processing_time=total_time,
+                    errors=all_errors,
+                    warnings=all_warnings,
+                    success=write_result.success and len(all_errors) == 0
+                )
+            else:
+                # Only parse results available
+                final_results[file_path] = ProcessingResult(
+                    file_path=file_path,
+                    institution=self._extract_institution_from_path(file_path),
+                    transactions_count=parse_result['transaction_count'],
+                    output_file="",
+                    processing_time=parse_result['parsing_time'],
+                    errors=parse_result['errors'],
+                    warnings=parse_result['warnings'],
+                    success=len(parse_result['errors']) == 0 and parse_result['transaction_count'] > 0
+                )
+        
+        return final_results
     
     def _extract_institution_from_path(self, file_path: str) -> str:
         """Extract institution name from file path"""
