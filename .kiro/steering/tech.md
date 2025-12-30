@@ -56,3 +56,35 @@ make clean
 - Uses modern pyproject.toml configuration
 - Editable installation with `pip install -e .`
 - Automatic package discovery in src/ layout
+
+## Running the Application
+
+### Main CLI Interface
+```bash
+# Process all files in raw directory
+python -m kiro_budget.cli process
+
+# Process specific directory
+python -m kiro_budget.cli process -d raw/chase
+
+# Process specific files
+python -m kiro_budget.cli process -f raw/chase/statement.pdf raw/chase/activity.qfx
+
+# Force reprocessing (ignore previous processing history)
+python -m kiro_budget.cli process --force
+
+# Generate processing report
+python -m kiro_budget.cli process -r processing_report.json
+```
+
+### CLI Options
+- `-f, --files TEXT`: Specific files to process
+- `-d, --directories TEXT`: Directories to process  
+- `--force`: Force reprocessing of previously processed files
+- `--no-recursive`: Disable recursive directory scanning
+- `-r, --report TEXT`: Save processing report to specified file
+
+### Data Organization
+- **Input**: Place files in `raw/` directory organized by institution (chase/, firsttech/, gemini/)
+- **Output**: Processed CSV files saved to `data/` directory
+- **Logs**: Processing logs available in `logs/` directory
