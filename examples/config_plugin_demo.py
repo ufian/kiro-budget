@@ -49,7 +49,6 @@ def create_sample_config():
                 "description": ["Description", "Memo"]
             }
         },
-        "output_filename_pattern": "{institution}_{account}_{start_date}_{end_date}.csv",
         "plugin_directories": [
             "plugins",
             "~/.kiro_budget/plugins"

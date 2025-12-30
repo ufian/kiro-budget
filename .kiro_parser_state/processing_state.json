@@ -1,55 +1,145 @@
 {
-  "last_updated": "2025-12-29T22:51:26.855131",
+  "last_updated": "2025-12-30T14:17:34.980070",
   "processed_files": {
     "raw/chase/20251104-statements-8147-.pdf": {
       "file_path": "raw/chase/20251104-statements-8147-.pdf",
       "file_hash": "924d8c8203c9e45e4f4ab213508e9ec9",
-      "last_processed": "2025-12-29T22:51:26.854828",
-      "output_file": "data/chase/chase_8147_20251005_20251103.csv",
+      "last_processed": "2025-12-30T14:15:55.175081",
+      "output_file": "data/chase/20251104-statements-8147-.pdf.csv",
       "transaction_count": 65,
       "success": true,
-      "processing_time": 0.558001290939331,
+      "processing_time": 0.5529069900512695,
       "file_size": 279547
     },
     "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX": {
       "file_path": "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX",
       "file_hash": "cd040936726e504e73d0d7709ec404ee",
-      "last_processed": "2025-12-29T22:51:26.855127",
-      "output_file": "data/chase/chase_8147_20251005_20251103.csv",
+      "last_processed": "2025-12-30T14:15:55.581181",
+      "output_file": "data/chase/Chase8147_Activity20251005_20251104_20251229.QFX.csv",
       "transaction_count": 70,
       "success": true,
-      "processing_time": 0.015648614547729492,
+      "processing_time": 0.015613794326782227,
       "file_size": 11164
     },
     "raw/firsttech/Misha.qfx": {
       "file_path": "raw/firsttech/Misha.qfx",
       "file_hash": "488e4a8e5c44960978006a6168f3302f",
-      "last_processed": "2025-12-29T21:32:49.174163",
-      "output_file": "data/firsttech/firsttech_0547_20251101_20251229.csv",
+      "last_processed": "2025-12-30T14:15:55.954077",
+      "output_file": "data/firsttech/Misha.qfx.csv",
       "transaction_count": 31,
       "success": true,
-      "processing_time": 0.010947942733764648,
+      "processing_time": 0.007581949234008789,
       "file_size": 8164
     },
     "raw/firsttech/Tanya.qfx": {
       "file_path": "raw/firsttech/Tanya.qfx",
       "file_hash": "51b4c8425198abb113241012165de890",
-      "last_processed": "2025-12-29T21:32:49.181624",
-      "output_file": "data/firsttech/firsttech_0596_20251101_20251229.csv",
+      "last_processed": "2025-12-30T14:15:55.961045",
+      "output_file": "data/firsttech/Tanya.qfx.csv",
       "transaction_count": 24,
       "success": true,
-      "processing_time": 0.0068318843841552734,
+      "processing_time": 0.0065898895263671875,
       "file_size": 6098
     },
     "raw/gemini/2025-full-year-statement.csv": {
       "file_path": "raw/gemini/2025-full-year-statement.csv",
       "file_hash": "5aaf0c37e2a63e05c24c5e6187439139",
-      "last_processed": "2025-12-29T21:32:49.187314",
-      "output_file": "",
-      "transaction_count": 0,
-      "success": false,
-      "processing_time": 0.005311012268066406,
+      "last_processed": "2025-12-30T14:17:34.980063",
+      "output_file": "data/gemini/2025-full-year-statement.csv.csv",
+      "transaction_count": 181,
+      "success": true,
+      "processing_time": 0.02382826805114746,
       "file_size": 12468
+    },
+    "raw/chase/20230718-statements-8147-.pdf": {
+      "file_path": "raw/chase/20230718-statements-8147-.pdf",
+      "file_hash": "b717558a2fd0f1d13509d116e7f19acb",
+      "last_processed": "2025-12-30T14:15:52.757386",
+      "output_file": "data/chase/20230718-statements-8147-.pdf.csv",
+      "transaction_count": 65,
+      "success": true,
+      "processing_time": 0.2536451816558838,
+      "file_size": 307622
+    },
+    "raw/chase/20230818-statements-8147-.pdf": {
+      "file_path": "raw/chase/20230818-statements-8147-.pdf",
+      "file_hash": "2a3e76055f80954284bfec2567b01e15",
+      "last_processed": "2025-12-30T14:15:52.995648",
+      "output_file": "data/chase/20230818-statements-8147-.pdf.csv",
+      "transaction_count": 64,
+      "success": true,
+      "processing_time": 0.23735594749450684,
+      "file_size": 301762
+    },
+    "raw/chase/20230918-statements-8147-.pdf": {
+      "file_path": "raw/chase/20230918-statements-8147-.pdf",
+      "file_hash": "05ee50b75526cd14fed81b30207eedbd",
+      "last_processed": "2025-12-30T14:15:53.294969",
+      "output_file": "data/chase/20230918-statements-8147-.pdf.csv",
+      "transaction_count": 64,
+      "success": true,
+      "processing_time": 0.2984147071838379,
+      "file_size": 298625
+    },
+    "raw/chase/20231018-statements-8147-.pdf": {
+      "file_path": "raw/chase/20231018-statements-8147-.pdf",
+      "file_hash": "13309f2fc077f76ca8172a2ae572f7b7",
+      "last_processed": "2025-12-30T14:15:53.648118",
+      "output_file": "data/chase/20231018-statements-8147-.pdf.csv",
+      "transaction_count": 72,
+      "success": true,
+      "processing_time": 0.3520488739013672,
+      "file_size": 308151
+    },
+    "raw/chase/20231118-statements-8147-.pdf": {
+      "file_path": "raw/chase/20231118-statements-8147-.pdf",
+      "file_hash": "a7a46cea9be64bee3d7e9f248b72451c",
+      "last_processed": "2025-12-30T14:15:53.965305",
+      "output_file": "data/chase/20231118-statements-8147-.pdf.csv",
+      "transaction_count": 98,
+      "success": true,
+      "processing_time": 0.3147590160369873,
+      "file_size": 319853
+    },
+    "raw/chase/20231218-statements-8147-.pdf": {
+      "file_path": "raw/chase/20231218-statements-8147-.pdf",
+      "file_hash": "0c8f2576108a40f0c226a36e70675a1d",
+      "last_processed": "2025-12-30T14:15:54.621213",
+      "output_file": "data/chase/20231218-statements-8147-.pdf.csv",
+      "transaction_count": 76,
+      "success": true,
+      "processing_time": 0.6531658172607422,
+      "file_size": 312384
+    },
+    "raw/chase/Chase8147_Activity20231224_20241223_20251223.QFX": {
+      "file_path": "raw/chase/Chase8147_Activity20231224_20241223_20251223.QFX",
+      "file_hash": "61bf8aff98916dbdba977d7e6358b1a5",
+      "last_processed": "2025-12-30T14:15:55.380391",
+      "output_file": "data/chase/Chase8147_Activity20231224_20241223_20251223.QFX.csv",
+      "transaction_count": 650,
+      "success": true,
+      "processing_time": 0.20457100868225098,
+      "file_size": 97355
+    },
+    "raw/chase/Chase8147_Activity20241224_20251223_20251223.QFX": {
+      "file_path": "raw/chase/Chase8147_Activity20241224_20251223_20251223.QFX",
+      "file_hash": "e584713496fefc6bec86b3a77a2eaf13",
+      "last_processed": "2025-12-30T14:15:55.565077",
+      "output_file": "data/chase/Chase8147_Activity20241224_20251223_20251223.QFX.csv",
+      "transaction_count": 868,
+      "success": true,
+      "processing_time": 0.1837921142578125,
+      "file_size": 129368
+    },
+    "raw/firsttech/All.qfx": {
+      "file_path": "raw/firsttech/All.qfx",
+      "file_hash": "065524a0aff0683b476ef8b13a98f67b",
+      "last_processed": "2025-12-30T14:15:55.945340",
+      "output_file": "data/firsttech/All.qfx.csv",
+      "transaction_count": 1480,
+      "success": true,
+      "processing_time": 0.3629751205444336,
+      "file_size": 352349
     }
   }
 }

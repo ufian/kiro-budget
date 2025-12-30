@@ -28,7 +28,8 @@ class CSVParser(FileParser):
             'date': [
                 'date', 'transaction_date', 'posting_date', 'Date', 'Transaction Date',
                 'Posting Date', 'trans_date', 'Trans Date', 'DATE', 'TRANSACTION_DATE',
-                'transaction date', 'posting date', 'effective_date', 'Effective Date'
+                'transaction date', 'posting date', 'effective_date', 'Effective Date',
+                'Transaction Post Date', 'transaction post date', 'TRANSACTION POST DATE'
             ],
             'amount': [
                 'amount', 'Amount', 'transaction_amount', 'debit_credit', 'Debit', 'Credit',
@@ -38,7 +39,8 @@ class CSVParser(FileParser):
             'description': [
                 'description', 'Description', 'memo', 'details', 'Memo', 'Details',
                 'DESCRIPTION', 'MEMO', 'DETAILS', 'transaction_description', 'payee',
-                'Payee', 'merchant', 'Merchant', 'reference', 'Reference', 'narration'
+                'Payee', 'merchant', 'Merchant', 'reference', 'Reference', 'narration',
+                'Description of Transaction', 'description of transaction', 'DESCRIPTION OF TRANSACTION'
             ],
             'account': [
                 'account', 'Account', 'account_number', 'Account Number', 'ACCOUNT',

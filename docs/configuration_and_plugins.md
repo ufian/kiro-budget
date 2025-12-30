@@ -49,7 +49,6 @@ The system searches for configuration files in the following order:
       "description": ["Description", "Memo"]
     }
   },
-  "output_filename_pattern": "{institution}_{account}_{start_date}_{end_date}.csv",
   "plugin_directories": [
     "plugins",
     "~/.kiro_budget/plugins"
@@ -86,8 +85,9 @@ The system searches for configuration files in the following order:
 - **date_formats**: List of date formats to try when parsing dates
 - **institution_mappings**: Map directory names to institution display names
 - **column_mappings**: Global column mapping rules for CSV files
-- **output_filename_pattern**: Pattern for output filenames
 - **plugin_directories**: Directories to search for plugins
+
+**Note**: Output filenames now preserve the original filename from the raw folder, changing only the extension to `.csv`.
 
 #### Institution-Specific Settings
 

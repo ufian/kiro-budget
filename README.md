@@ -171,8 +171,7 @@ Create a `config.json` file to customize behavior:
   "institution_mappings": {
     "chase": "Chase Bank",
     "bofa": "Bank of America"
-  },
-  "output_filename_pattern": "{institution}_{account}_{start_date}_{end_date}.csv"
+  }
 }
 ```
 

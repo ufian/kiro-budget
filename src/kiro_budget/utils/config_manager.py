@@ -50,10 +50,6 @@ class ConfigManager:
                 date_formats=config_data.get('date_formats'),
                 institution_mappings=config_data.get('institution_mappings'),
                 column_mappings=config_data.get('column_mappings'),
-                output_filename_pattern=config_data.get(
-                    'output_filename_pattern', 
-                    '{institution}_{account}_{start_date}_{end_date}.csv'
-                ),
                 plugin_directories=config_data.get('plugin_directories')
             )
             
@@ -272,7 +268,10 @@ class ConfigManager:
                 "%Y-%m-%d",
                 "%d/%m/%Y",
                 "%Y-%m-%d %H:%M:%S",
-                "%m/%d/%Y %H:%M:%S"
+                "%m/%d/%Y %H:%M:%S",
+                "%m/%d/%y",
+                "%d/%m/%y",
+                "%y-%m-%d"
             ],
             "institution_mappings": {
                 "chase": "Chase Bank",
@@ -287,7 +286,6 @@ class ConfigManager:
                     "description": ["Description", "Memo"]
                 }
             },
-            "output_filename_pattern": "{institution}_{account}_{start_date}_{end_date}.csv",
             "plugin_directories": [
                 "plugins",
                 "~/.kiro_budget/plugins"

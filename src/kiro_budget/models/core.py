@@ -43,14 +43,14 @@ class ParserConfig:
     date_formats: Optional[List[str]] = None
     institution_mappings: Optional[Dict[str, str]] = None
     column_mappings: Optional[Dict[str, Dict[str, List[str]]]] = None
-    output_filename_pattern: str = "{institution}_{account}_{start_date}_{end_date}.csv"
     plugin_directories: Optional[List[str]] = None
     
     def __post_init__(self):
         if self.date_formats is None:
             self.date_formats = [
                 "%m/%d/%Y", "%Y-%m-%d", "%d/%m/%Y", 
-                "%Y-%m-%d %H:%M:%S", "%m/%d/%Y %H:%M:%S"
+                "%Y-%m-%d %H:%M:%S", "%m/%d/%Y %H:%M:%S",
+                "%m/%d/%y", "%d/%m/%y", "%y-%m-%d"
             ]
         if self.institution_mappings is None:
             self.institution_mappings = {}

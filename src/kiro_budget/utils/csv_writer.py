@@ -65,53 +65,28 @@ class CSVWriter:
     
     def generate_output_path(self, transactions: List[Transaction], source_file_path: str) -> str:
         """
-        Generate output file path based on transactions and configuration
+        Generate output file path based on original filename from raw folder
         
         Args:
-            transactions: List of transactions to determine date range and institution
+            transactions: List of transactions to determine institution
             source_file_path: Original source file path for context
             
         Returns:
-            Generated output file path
+            Generated output file path using original filename with .csv appended
         """
-        if not transactions:
-            # Fallback for empty transaction list
+        # Extract institution from transactions or path
+        if transactions:
+            institution = transactions[0].institution.lower().replace(' ', '_')
+        else:
             institution = self._extract_institution_from_path(source_file_path)
-            account = self._extract_account_from_path(source_file_path)
-            timestamp = datetime.now().strftime("%Y%m%d")
-            filename = f"{institution}_{account}_{timestamp}.csv"
-            return os.path.join(self.config.data_directory, institution, filename)
         
-        # Extract information from transactions
-        institution = transactions[0].institution.lower().replace(' ', '_')
-        account = transactions[0].account
-        
-        # Find date range
-        dates = [t.date for t in transactions]
-        start_date = min(dates).strftime("%Y%m%d")
-        end_date = max(dates).strftime("%Y%m%d")
-        
-        # Generate filename using pattern
-        filename_vars = {
-            'institution': institution,
-            'account': account,
-            'start_date': start_date,
-            'end_date': end_date
-        }
-        
-        try:
-            filename = self.config.output_filename_pattern.format(**filename_vars)
-        except KeyError:
-            # Fallback if pattern has invalid variables
-            filename = f"{institution}_{account}_{start_date}_{end_date}.csv"
-        
-        # Ensure filename ends with .csv
-        if not filename.lower().endswith('.csv'):
-            filename += '.csv'
+        # Keep original filename and append .csv
+        original_filename = os.path.basename(source_file_path)
+        csv_filename = f"{original_filename}.csv"
         
         # Create institution-based directory structure
         institution_dir = os.path.join(self.config.data_directory, institution)
-        return os.path.join(institution_dir, filename)
+        return os.path.join(institution_dir, csv_filename)
     
     def create_unique_filename(self, base_path: str) -> str:
         """

@@ -46,8 +46,7 @@ class TestConfigManager(unittest.TestCase):
             "date_formats": ["%Y-%m-%d", "%m/%d/%Y"],
             "institution_mappings": {
                 "chase": "Chase Bank"
-            },
-            "output_filename_pattern": "custom_{institution}_{account}.csv"
+            }
         }
         
         with open(self.config_file, 'w') as f:
@@ -62,7 +61,6 @@ class TestConfigManager(unittest.TestCase):
         self.assertTrue(config.force_reprocess)
         self.assertEqual(config.date_formats, ["%Y-%m-%d", "%m/%d/%Y"])
         self.assertEqual(config.institution_mappings["chase"], "Chase Bank")
-        self.assertEqual(config.output_filename_pattern, "custom_{institution}_{account}.csv")
     
     def test_institution_config_loading(self):
         """Test loading institution-specific configurations"""

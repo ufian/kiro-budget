@@ -113,14 +113,30 @@ class FinancialDataParserCLI:
         
         # Check if we should use batch processing with duplicate detection
         if len(files_to_process) > 1:
-            # Use batch processing with duplicate detection
-            results = self._process_files_with_merging(files_to_process)
-            processed_count = len([r for r in results.values() if r.success or not r.success])
-            successful_count = len([r for r in results.values() if r.success])
+            # Process each file individually (no merging)
+            processed_count = 0
+            successful_count = 0
+            total_files = len(files_to_process)
             
-            # Record all results
-            for result in results.values():
-                self.processing_tracker.record_processing_result(result)
+            for i, file_path in enumerate(files_to_process, 1):
+                try:
+                    # Progress reporting
+                    self._report_progress(i, total_files, file_path)
+                    
+                    result = self._process_single_file(file_path)
+                    self.processing_tracker.record_processing_result(result)
+                    
+                    processed_count += 1
+                    if result.success:
+                        successful_count += 1
+                        
+                except Exception as e:
+                    self.error_handler.log_error(
+                        f"Unexpected error processing {file_path}: {str(e)}",
+                        "PROCESSING_ERROR",
+                        file_path=file_path,
+                        exception=e
+                    )
         else:
             # Process single file with original logic
             processed_count = 0
