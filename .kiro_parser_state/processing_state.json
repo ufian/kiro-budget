@@ -1,0 +1,55 @@
+{
+  "last_updated": "2025-12-29T21:32:49.187320",
+  "processed_files": {
+    "raw/chase/20251104-statements-8147-.pdf": {
+      "file_path": "raw/chase/20251104-statements-8147-.pdf",
+      "file_hash": "924d8c8203c9e45e4f4ab213508e9ec9",
+      "last_processed": "2025-12-29T21:32:49.145804",
+      "output_file": "data/chase/chase_8147_20251003_20251102.csv",
+      "transaction_count": 65,
+      "success": true,
+      "processing_time": 0.554750919342041,
+      "file_size": 279547
+    },
+    "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX": {
+      "file_path": "raw/chase/Chase8147_Activity20251005_20251104_20251229.QFX",
+      "file_hash": "cd040936726e504e73d0d7709ec404ee",
+      "last_processed": "2025-12-29T21:32:49.162871",
+      "output_file": "data/chase/chase_8147_20251005_20251103.csv",
+      "transaction_count": 70,
+      "success": true,
+      "processing_time": 0.016644954681396484,
+      "file_size": 11164
+    },
+    "raw/firsttech/Misha.qfx": {
+      "file_path": "raw/firsttech/Misha.qfx",
+      "file_hash": "488e4a8e5c44960978006a6168f3302f",
+      "last_processed": "2025-12-29T21:32:49.174163",
+      "output_file": "data/firsttech/firsttech_0547_20251101_20251229.csv",
+      "transaction_count": 31,
+      "success": true,
+      "processing_time": 0.010947942733764648,
+      "file_size": 8164
+    },
+    "raw/firsttech/Tanya.qfx": {
+      "file_path": "raw/firsttech/Tanya.qfx",
+      "file_hash": "51b4c8425198abb113241012165de890",
+      "last_processed": "2025-12-29T21:32:49.181624",
+      "output_file": "data/firsttech/firsttech_0596_20251101_20251229.csv",
+      "transaction_count": 24,
+      "success": true,
+      "processing_time": 0.0068318843841552734,
+      "file_size": 6098
+    },
+    "raw/gemini/2025-full-year-statement.csv": {
+      "file_path": "raw/gemini/2025-full-year-statement.csv",
+      "file_hash": "5aaf0c37e2a63e05c24c5e6187439139",
+      "last_processed": "2025-12-29T21:32:49.187314",
+      "output_file": "",
+      "transaction_count": 0,
+      "success": false,
+      "processing_time": 0.005311012268066406,
+      "file_size": 12468
+    }
+  }
+}

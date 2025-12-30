@@ -1,0 +1,72 @@
+{
+  "raw_directory": "raw",
+  "data_directory": "data",
+  "skip_processed": true,
+  "force_reprocess": false,
+  "date_formats": [
+    "%m/%d/%Y",
+    "%Y-%m-%d",
+    "%d/%m/%Y",
+    "%Y-%m-%d %H:%M:%S",
+    "%m/%d/%Y %H:%M:%S"
+  ],
+  "institution_mappings": {
+    "chase": "Chase Bank",
+    "bofa": "Bank of America",
+    "wells": "Wells Fargo",
+    "citi": "Citibank"
+  },
+  "column_mappings": {
+    "chase": {
+      "date": [
+        "Date",
+        "Transaction Date"
+      ],
+      "amount": [
+        "Amount",
+        "Debit",
+        "Credit"
+      ],
+      "description": [
+        "Description",
+        "Memo"
+      ]
+    }
+  },
+  "output_filename_pattern": "{institution}_{account}_{start_date}_{end_date}.csv",
+  "plugin_directories": [
+    "plugins",
+    "~/.kiro_budget/plugins"
+  ],
+  "institutions": {
+    "chase": {
+      "parser_type": "qfx",
+      "column_mappings": {
+        "date": "Date",
+        "amount": "Amount",
+        "description": "Description",
+        "account": "Account"
+      },
+      "date_format": "%m/%d/%Y",
+      "amount_format": "decimal",
+      "account_extraction_pattern": "statements-(\\d{4})-",
+      "custom_rules": {
+        "skip_pending": true,
+        "merge_transfers": false
+      }
+    },
+    "bank_of_america": {
+      "parser_type": "csv",
+      "column_mappings": {
+        "date": "Posted Date",
+        "amount": "Amount",
+        "description": "Payee",
+        "account": "Account"
+      },
+      "date_format": "%m/%d/%Y",
+      "amount_format": "decimal",
+      "account_extraction_pattern": "account_(\\d+)",
+      "custom_rules": {}
+    }
+  }
+}

@@ -2,16 +2,12 @@
 
 ## Core Technologies
 
-- **Python**: 3.8+ (supports 3.8-3.12)
+- **Python**: 3.8+ (supports 3.8-3.14+)
 - **Build System**: setuptools with pyproject.toml configuration
 - **Package Management**: pip with requirements.txt files
 - **Virtual Environment**: `./venv` (required for development)
 
 ## Key Dependencies
-
-### Production
-- **pandas**: >=1.5.0 - Data manipulation and analysis
-- **numpy**: >=1.20.0 - Numerical computing support
 
 ### Development
 - **pytest**: >=7.0.0 - Testing framework with coverage reporting
