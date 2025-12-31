@@ -134,6 +134,9 @@ class CSVParser(FileParser):
             
             logger.info(f"Successfully parsed {len(transactions)} transactions from {file_path}")
             
+            # Apply automatic sign correction
+            transactions = self.apply_sign_correction(transactions)
+            
         except Exception as e:
             logger.error(f"Error parsing CSV file {file_path}: {str(e)}")
         

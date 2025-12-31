@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
-from ..models.core import Transaction, ParserConfig
+from ..models.core import Transaction, ParserConfig, AccountConfig
+from ..utils.sign_detector import TransactionSignDetector
 
 
 class FileParser(ABC):
@@ -13,6 +14,7 @@ class FileParser(ABC):
     
     def __init__(self, config: ParserConfig):
         self.config = config
+        self.sign_detector = TransactionSignDetector()
     
     @abstractmethod
     def parse(self, file_path: str) -> List[Transaction]:
@@ -28,6 +30,22 @@ class FileParser(ABC):
     def validate_file(self, file_path: str) -> bool:
         """Validate if file can be processed by this parser"""
         pass
+    
+    def apply_sign_correction(self, transactions: List[Transaction], 
+                            account_config: Optional[AccountConfig] = None) -> List[Transaction]:
+        """Apply automatic sign correction to transactions.
+        
+        This method should be called by concrete parsers after parsing
+        to ensure consistent sign convention across all file types.
+        
+        Args:
+            transactions: List of parsed transactions
+            account_config: Optional account configuration for additional context
+            
+        Returns:
+            List of transactions with corrected signs
+        """
+        return self.sign_detector.correct_transaction_signs(transactions, account_config)
 
 
 class DataTransformer:

@@ -110,6 +110,9 @@ class PDFParser(FileParser):
                 
                 logger.info(f"Extracted {len(transactions)} transactions from {file_path}")
                 
+                # Apply automatic sign correction
+                transactions = self.apply_sign_correction(transactions)
+                
         except Exception as e:
             logger.error(f"Error parsing PDF file {file_path}: {e}")
             # Don't raise exception - return empty list and let error handling deal with it

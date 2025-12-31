@@ -90,9 +90,9 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
     
     Returns one of: 'income', 'internal_transfer', 'external_transfer', 'spending', 'refund'
     
-    Note: Credit card sign conventions vary by institution:
-    - Chase: Negative = spending, Positive = payments/credits
-    - Gemini: Positive = spending, Negative = payments/credits
+    Note: All transactions now follow banking convention after automatic sign detection:
+    - Negative amounts = spending (money going out)
+    - Positive amounts = income, refunds, payments (money coming in)
     """
     desc_lower = description.lower()
     
@@ -135,53 +135,28 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
 
 
 def _classify_credit_card_transaction(description: str, amount: Decimal, institution: str) -> str:
-    """Classify credit card transactions with institution-specific logic."""
+    """Classify credit card transactions using banking convention.
+    
+    NOTE: All transactions now follow banking convention after sign detection:
+    - Negative amounts = spending (money going out)
+    - Positive amounts = income/refunds/payments (money coming in)
+    """
     
     # Check for transfer patterns first (regardless of institution)
     desc_lower = description.lower()
     if any(pattern in desc_lower for pattern in ['payment transaction', 'deposit internet transfer', 'transfer']):
         return 'internal_transfer'
     
-    # Institution-specific sign conventions
-    if institution.lower() == 'gemini':
-        # Gemini: Positive = spending, Negative = payments/credits
-        if amount > 0:
-            # Use amount threshold to distinguish purchases from large payments
-            if amount > 1000:  # Large amounts might be payments
-                # Check if this looks like a payment description
-                if any(pattern in desc_lower for pattern in ['payment', 'pymt']):
-                    return 'internal_transfer'
-            return 'spending'
-        else:
-            # Negative amounts are typically payments/credits for Gemini
-            return 'internal_transfer' if abs(amount) > 100 else 'refund'
-    
-    elif institution.lower() == 'chase':
-        # Chase: Negative = spending, Positive = payments/credits
-        if amount < 0:
-            return 'spending'
-        else:
-            return 'refund'
-    
-    elif institution.lower() == 'apple':
-        # Apple Card: Negative = spending, Positive = payments/credits (same as Chase)
-        if amount < 0:
-            return 'spending'
-        else:
-            return 'refund'
-    
+    # All credit card transactions now follow banking convention
+    # regardless of original institution format
+    if amount < 0:
+        # Negative amounts are spending
+        return 'spending'
     else:
-        # Default/unknown institution: Use amount-based heuristics
-        abs_amount = abs(amount)
-        
-        # Very large amounts (>$2000) are likely payments regardless of sign
-        if abs_amount > 2000:
-            if any(pattern in desc_lower for pattern in ['payment', 'transfer', 'pymt']):
-                return 'internal_transfer'
-        
-        # For unknown institutions, assume standard convention (negative = spending)
-        if amount < 0:
-            return 'spending'
+        # Positive amounts are payments/refunds/credits
+        # Use amount threshold and description to distinguish
+        if abs(amount) > 100 and any(pattern in desc_lower for pattern in CREDIT_CARD_PAYMENT_PATTERNS):
+            return 'internal_transfer'
         else:
             return 'refund'
 

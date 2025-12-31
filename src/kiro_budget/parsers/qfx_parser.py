@@ -131,6 +131,9 @@ class QFXParser(FileParser):
                 }
             )
             
+            # Apply automatic sign correction
+            transactions = self.apply_sign_correction(transactions)
+            
         except OfxParserException as e:
             self.error_handler.log_error(
                 f"OFX parsing error: {str(e)}",
