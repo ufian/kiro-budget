@@ -8,6 +8,10 @@ report with monthly summaries showing:
 - External transfers (transfers out to external accounts)
 - Total spending (purchases, bills, etc.)
 
+IMPORTANT: Internal transfers may have up to 3 business days of processing lag,
+which means transfer pairs might appear in different months. Monthly totals
+for internal transfers may not balance perfectly within a single month.
+
 Sign convention:
 - Negative numbers = spending (money going out)
 - Positive numbers = income, refunds, credits (money coming in)
@@ -81,14 +85,14 @@ REFUND_PATTERNS = [
 ]
 
 
-def classify_transaction(description: str, amount: Decimal, account_type: str = 'debit') -> str:
+def classify_transaction(description: str, amount: Decimal, account_type: str = 'debit', institution: str = '') -> str:
     """Classify a transaction into a category.
     
     Returns one of: 'income', 'internal_transfer', 'external_transfer', 'spending', 'refund'
     
-    Note: Credit card accounts have inverted sign convention:
-    - Positive amounts = charges (spending)
-    - Negative amounts = payments/credits (refunds)
+    Note: Credit card sign conventions vary by institution:
+    - Chase: Negative = spending, Positive = payments/credits
+    - Gemini: Positive = spending, Negative = payments/credits
     """
     desc_lower = description.lower()
     
@@ -117,14 +121,9 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
         if pattern in desc_lower:
             return 'refund'
     
-    # For credit card accounts, signs are inverted:
-    # - Positive = charges (spending)
-    # - Negative = payments/credits (refunds)
+    # For credit card accounts, handle different sign conventions by institution
     if account_type == 'credit':
-        if amount > 0:
-            return 'spending'
-        else:
-            return 'refund'
+        return _classify_credit_card_transaction(description, amount, institution)
     
     # For debit/checking accounts:
     # - Negative amounts are spending
@@ -133,6 +132,58 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
         return 'spending'
     else:
         return 'refund'
+
+
+def _classify_credit_card_transaction(description: str, amount: Decimal, institution: str) -> str:
+    """Classify credit card transactions with institution-specific logic."""
+    
+    # Check for transfer patterns first (regardless of institution)
+    desc_lower = description.lower()
+    if any(pattern in desc_lower for pattern in ['payment transaction', 'deposit internet transfer', 'transfer']):
+        return 'internal_transfer'
+    
+    # Institution-specific sign conventions
+    if institution.lower() == 'gemini':
+        # Gemini: Positive = spending, Negative = payments/credits
+        if amount > 0:
+            # Use amount threshold to distinguish purchases from large payments
+            if amount > 1000:  # Large amounts might be payments
+                # Check if this looks like a payment description
+                if any(pattern in desc_lower for pattern in ['payment', 'pymt']):
+                    return 'internal_transfer'
+            return 'spending'
+        else:
+            # Negative amounts are typically payments/credits for Gemini
+            return 'internal_transfer' if abs(amount) > 100 else 'refund'
+    
+    elif institution.lower() == 'chase':
+        # Chase: Negative = spending, Positive = payments/credits
+        if amount < 0:
+            return 'spending'
+        else:
+            return 'refund'
+    
+    elif institution.lower() == 'apple':
+        # Apple Card: Negative = spending, Positive = payments/credits (same as Chase)
+        if amount < 0:
+            return 'spending'
+        else:
+            return 'refund'
+    
+    else:
+        # Default/unknown institution: Use amount-based heuristics
+        abs_amount = abs(amount)
+        
+        # Very large amounts (>$2000) are likely payments regardless of sign
+        if abs_amount > 2000:
+            if any(pattern in desc_lower for pattern in ['payment', 'transfer', 'pymt']):
+                return 'internal_transfer'
+        
+        # For unknown institutions, assume standard convention (negative = spending)
+        if amount < 0:
+            return 'spending'
+        else:
+            return 'refund'
 
 
 def load_transactions(csv_path: str) -> list:
@@ -191,14 +242,13 @@ def aggregate_by_month(transactions: list) -> tuple:
     for txn in transactions:
         month_key = txn['date'].strftime('%Y-%m')
         account_type = txn.get('account_type', 'debit')
-        category = classify_transaction(txn['description'], txn['amount'], account_type)
+        category = classify_transaction(txn['description'], txn['amount'], account_type, txn.get('institution', ''))
         amount = txn['amount']
         
-        # Normalize credit card amounts to standard sign convention:
-        # - Spending should be negative
-        # - Credits/refunds should be positive
-        if account_type == 'credit':
-            amount = -amount  # Invert sign for credit cards
+        # Credit card amounts already follow standard sign convention:
+        # - Negative = spending, Positive = credits/payments
+        # No normalization needed for credit cards
+        amount = txn['amount']
         
         # Store transaction for drill-down
         txn_data = {
@@ -437,6 +487,13 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
         <div class="legend-title">Sign Convention:</div>
         <span class="legend-item legend-negative">Negative (-) = Spending (money out)</span>
         <span class="legend-item legend-positive">Positive (+) = Income, Refunds, Credits (money in)</span>
+    </div>
+    <div class="legend" style="background: #fff3e0; border-left: 4px solid #ff9800;">
+        <div class="legend-title" style="color: #e65100;">⚠️ Internal Transfer Timing:</div>
+        <p style="margin: 5px 0; color: #bf360c; font-size: 0.9em;">
+            Internal transfers may have up to 3 business days of processing lag. 
+            Transfer pairs might appear in different months, causing monthly internal transfer totals to not balance perfectly.
+        </p>
     </div>
     <p style="color: #666;">Click on any value to see the underlying transactions.</p>
     <table>

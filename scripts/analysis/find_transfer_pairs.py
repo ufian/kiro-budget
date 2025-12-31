@@ -2,10 +2,12 @@
 """Find matching transfer pairs between accounts.
 
 This script identifies transactions that are likely internal transfers:
-- Same date
 - Same absolute amount
+- Within 3 business days (to account for processing lag)
 - One from debit account (withdrawal)
 - One from credit account (payment received)
+
+Internal transfers may have up to 3 business days of lag between accounts.
 
 Usage:
     python scripts/analysis/find_transfer_pairs.py [input_csv]
@@ -14,7 +16,7 @@ Usage:
 import csv
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -46,110 +48,199 @@ def load_transactions(csv_path: str) -> list:
     return transactions
 
 
-def find_transfer_pairs(transactions: list) -> list:
-    """Find matching transfer pairs.
+def is_business_day(date):
+    """Check if a date is a business day (Monday-Friday)."""
+    return date.weekday() < 5
+
+
+def business_days_between(start_date, end_date):
+    """Calculate the number of business days between two dates."""
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
     
-    Returns list of (debit_txn, credit_txn) pairs.
+    business_days = 0
+    current_date = start_date
+    
+    while current_date <= end_date:
+        if is_business_day(current_date):
+            business_days += 1
+        current_date += timedelta(days=1)
+    
+    return business_days
+
+
+def find_transfer_pairs_with_lag(transactions: list, max_business_days: int = 3) -> list:
+    """Find matching transfer pairs accounting for processing lag.
+    
+    Returns list of (debit_txn, credit_txn, days_lag) tuples.
     """
-    # Group by date and absolute amount
-    groups = defaultdict(list)
+    # Group transactions by absolute amount
+    amount_groups = defaultdict(list)
     
     for txn in transactions:
-        key = (txn['date'].strftime('%Y-%m-%d'), str(txn['abs_amount']))
-        groups[key].append(txn)
+        amount_groups[str(txn['abs_amount'])].append(txn)
     
     pairs = []
     
-    for (date, amount), txns in groups.items():
+    for amount, txns in amount_groups.items():
         if len(txns) < 2:
             continue
         
-        # Separate by account type
-        debit_txns = [t for t in txns if t['account_type'] == 'debit' and t['amount'] < 0]
-        credit_txns = [t for t in txns if t['account_type'] == 'credit' and t['amount'] < 0]
-        
-        # Also check for positive amounts on credit (payment received)
-        credit_payments = [t for t in txns if t['account_type'] == 'credit' and t['amount'] > 0]
-        
-        # Match debit withdrawals with credit payments
-        for debit in debit_txns:
-            # Look for matching credit card payment
-            for credit in credit_txns:
-                if debit['institution'] != credit['institution']:
-                    # Different institutions - likely a transfer
-                    pairs.append((debit, credit))
-                    break
+        # Look for potential transfer pairs within the same amount group
+        for i, txn1 in enumerate(txns):
+            for txn2 in txns[i+1:]:
+                # Skip if same institution AND same account (likely duplicates)
+                if txn1['institution'] == txn2['institution'] and txn1['account'] == txn2['account']:
+                    continue
+                
+                # Calculate business days between transactions
+                days_diff = business_days_between(txn1['date'], txn2['date'])
+                
+                if days_diff <= max_business_days:
+                    # Check if this looks like a transfer pair
+                    # One should be negative (outgoing), one positive (incoming)
+                    if (txn1['amount'] < 0 and txn2['amount'] > 0) or \
+                       (txn1['amount'] > 0 and txn2['amount'] < 0):
+                        
+                        # Determine which is the source (outgoing) and destination (incoming)
+                        if txn1['amount'] < 0:
+                            source_txn, dest_txn = txn1, txn2
+                        else:
+                            source_txn, dest_txn = txn2, txn1
+                        
+                        pairs.append((source_txn, dest_txn, days_diff))
     
     return pairs
 
 
-def find_potential_transfers(transactions: list) -> dict:
-    """Find all potential internal transfer transactions.
+def find_transfer_pairs(transactions: list) -> list:
+    """Find matching transfer pairs (legacy function for backward compatibility).
     
-    Groups transactions by date and amount to find matches.
+    Returns list of (debit_txn, credit_txn) pairs.
     """
-    # Group by date and absolute amount
-    groups = defaultdict(list)
+    pairs_with_lag = find_transfer_pairs_with_lag(transactions)
+    return [(source, dest) for source, dest, _ in pairs_with_lag]
+
+
+def find_potential_transfers_with_lag(transactions: list, max_business_days: int = 3) -> dict:
+    """Find all potential internal transfer transactions accounting for lag.
+    
+    Groups transactions by amount and looks for matches within the business day window.
+    """
+    # Group by absolute amount
+    amount_groups = defaultdict(list)
     
     for txn in transactions:
-        key = (txn['date'].strftime('%Y-%m-%d'), str(txn['abs_amount']))
-        groups[key].append(txn)
+        amount_groups[str(txn['abs_amount'])].append(txn)
     
-    # Filter to groups with 2+ transactions
-    potential = {k: v for k, v in groups.items() if len(v) >= 2}
+    # Find potential matches within each amount group
+    potential = {}
+    
+    for amount, txns in amount_groups.items():
+        if len(txns) < 2:
+            continue
+        
+        # Look for transactions within the lag window
+        matches = []
+        for i, txn1 in enumerate(txns):
+            for txn2 in txns[i+1:]:
+                days_diff = business_days_between(txn1['date'], txn2['date'])
+                
+                if days_diff <= max_business_days:
+                    # Check if signs are opposite (transfer pattern)
+                    if (txn1['amount'] < 0 and txn2['amount'] > 0) or \
+                       (txn1['amount'] > 0 and txn2['amount'] < 0):
+                        
+                        # Sort by date for consistent display
+                        if txn1['date'] <= txn2['date']:
+                            matches.append((txn1, txn2, days_diff))
+                        else:
+                            matches.append((txn2, txn1, days_diff))
+        
+        if matches:
+            potential[amount] = matches
     
     return potential
 
 
 def print_transfer_analysis(transactions: list):
-    """Print analysis of potential transfers."""
+    """Print analysis of potential transfers with lag consideration."""
     
-    potential = find_potential_transfers(transactions)
+    potential = find_potential_transfers_with_lag(transactions)
     
     print("=" * 80)
-    print("POTENTIAL INTERNAL TRANSFER PAIRS")
+    print("POTENTIAL INTERNAL TRANSFER PAIRS (with 3-day lag consideration)")
     print("=" * 80)
     print()
     
-    # Sort by date
-    sorted_keys = sorted(potential.keys())
+    # Sort by amount (descending)
+    sorted_amounts = sorted(potential.keys(), key=lambda x: Decimal(x), reverse=True)
     
     transfer_count = 0
     total_amount = Decimal('0')
     
-    for date, amount in sorted_keys:
-        txns = potential[(date, amount)]
+    for amount in sorted_amounts:
+        matches = potential[amount]
         
-        # Check if this looks like an internal transfer
-        institutions = set(t['institution'] for t in txns)
-        account_types = set(t['account_type'] for t in txns)
-        
-        # Skip if all same institution (likely duplicates, not transfers)
-        if len(institutions) == 1 and len(txns) == 2:
-            # Could be internal transfer within same institution
-            signs = [t['amount'] > 0 for t in txns]
-            if signs[0] != signs[1]:
-                # One positive, one negative - internal transfer
-                pass
-            else:
-                continue
-        
-        print(f"Date: {date}, Amount: ${amount}")
+        print(f"Amount: ${amount}")
         print("-" * 60)
         
-        for txn in txns:
-            sign = "+" if txn['amount'] > 0 else "-"
-            print(f"  {sign}${txn['abs_amount']:>10} | {txn['account_type']:6} | "
-                  f"{txn['institution']:12} | {txn['description'][:40]}")
-        
-        print()
-        transfer_count += 1
-        total_amount += Decimal(amount)
+        for txn1, txn2, days_lag in matches:
+            # Determine source and destination
+            if txn1['amount'] < 0:
+                source, dest = txn1, txn2
+            else:
+                source, dest = txn2, txn1
+            
+            lag_info = f" ({days_lag} business day{'s' if days_lag != 1 else ''} lag)" if days_lag > 0 else " (same day)"
+            
+            print(f"  {source['date'].strftime('%Y-%m-%d')} → {dest['date'].strftime('%Y-%m-%d')}{lag_info}")
+            print(f"    OUT: ${source['abs_amount']:>10} | {source['account_type']:6} | "
+                  f"{source['institution']:12} | {source['description'][:35]}")
+            print(f"    IN:  ${dest['abs_amount']:>10} | {dest['account_type']:6} | "
+                  f"{dest['institution']:12} | {dest['description'][:35]}")
+            print()
+            
+            transfer_count += 1
+            total_amount += Decimal(amount)
     
     print("=" * 80)
-    print(f"Found {transfer_count} potential transfer groups")
+    print(f"Found {transfer_count} potential transfer pairs")
     print(f"Total amount involved: ${total_amount:,.2f}")
     print("=" * 80)
+    
+    # Add summary of lag distribution
+    if transfer_count > 0:
+        lag_counts = defaultdict(int)
+        for matches in potential.values():
+            for _, _, days_lag in matches:
+                lag_counts[days_lag] += 1
+        
+        print("\nLag Distribution:")
+        for days in sorted(lag_counts.keys()):
+            count = lag_counts[days]
+            percentage = (count / transfer_count) * 100
+            lag_desc = "same day" if days == 0 else f"{days} business day{'s' if days != 1 else ''}"
+            print(f"  {lag_desc:15}: {count:3d} pairs ({percentage:5.1f}%)")
+        print()
+
+
+def find_potential_transfers(transactions: list) -> dict:
+    """Legacy function for backward compatibility."""
+    potential_with_lag = find_potential_transfers_with_lag(transactions)
+    
+    # Convert to old format for compatibility
+    legacy_format = {}
+    for amount, matches in potential_with_lag.items():
+        for txn1, txn2, _ in matches:
+            # Use the earlier date as the key
+            date_key = min(txn1['date'], txn2['date']).strftime('%Y-%m-%d')
+            key = (date_key, amount)
+            if key not in legacy_format:
+                legacy_format[key] = []
+            legacy_format[key].extend([txn1, txn2])
+    
+    return legacy_format
 
 
 def print_credit_card_payments(transactions: list):
