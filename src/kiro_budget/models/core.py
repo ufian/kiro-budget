@@ -8,6 +8,24 @@ from typing import List, Dict, Any, Optional
 
 
 @dataclass
+class AccountConfig:
+    """Configuration for a single account.
+    
+    Attributes:
+        account_id: Unique identifier for the account (e.g., last 4 digits)
+        institution: Financial institution name (e.g., "firsttech", "chase")
+        account_name: Human-readable account name (e.g., "Main Checking")
+        account_type: Account classification - "debit" or "credit"
+        description: Optional notes about the account
+    """
+    account_id: str
+    institution: str
+    account_name: str
+    account_type: str  # "debit" or "credit"
+    description: Optional[str] = None
+
+
+@dataclass
 class Transaction:
     """Unified transaction data structure"""
     date: datetime
@@ -18,6 +36,37 @@ class Transaction:
     transaction_id: Optional[str] = None
     category: Optional[str] = None
     balance: Optional[Decimal] = None
+
+
+@dataclass
+class EnrichedTransaction:
+    """Transaction with account configuration applied.
+    
+    Extends the base Transaction with human-readable account name
+    and account type from the account configuration.
+    
+    Attributes:
+        date: Transaction date
+        amount: Transaction amount
+        description: Transaction description
+        account: Raw account ID from source file
+        institution: Financial institution name
+        transaction_id: Unique transaction identifier
+        category: Transaction category
+        balance: Account balance after transaction
+        account_name: Human-readable account name from config
+        account_type: Account classification - "debit" or "credit"
+    """
+    date: datetime
+    amount: Decimal
+    description: str
+    account: str
+    institution: str
+    transaction_id: Optional[str] = None
+    category: Optional[str] = None
+    balance: Optional[Decimal] = None
+    account_name: str = ""
+    account_type: str = "debit"
 
 
 @dataclass

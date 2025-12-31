@@ -1,5 +1,19 @@
 """Data models and structures"""
 
-from .core import Transaction, ProcessingResult, ParserConfig, InstitutionConfig
+from .core import (
+    AccountConfig,
+    EnrichedTransaction,
+    InstitutionConfig,
+    ParserConfig,
+    ProcessingResult,
+    Transaction,
+)
 
-__all__ = ['Transaction', 'ProcessingResult', 'ParserConfig', 'InstitutionConfig']
+__all__ = [
+    'AccountConfig',
+    'EnrichedTransaction',
+    'InstitutionConfig',
+    'ParserConfig',
+    'ProcessingResult',
+    'Transaction',
+]

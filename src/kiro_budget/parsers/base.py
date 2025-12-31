@@ -1,5 +1,6 @@
 """Abstract base classes and interfaces for file parsers."""
 
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from decimal import Decimal

@@ -47,39 +47,71 @@ class DuplicateDetector:
             validated_groups = {}
             for signature, group in signature_groups.items():
                 if len(group) > 1:
-                    # Further validate that transactions in the group are within date tolerance
-                    validated_group = self._validate_date_tolerance_in_group(group)
-                    if len(validated_group) > 1:
-                        validated_groups[signature] = validated_group
+                    # Cluster transactions by date proximity
+                    date_clusters = self._validate_date_tolerance_in_group(group)
+                    for sub_sig, cluster in date_clusters.items():
+                        # Create unique signature combining original sig and date cluster
+                        unique_sig = f"{signature}_{sub_sig}"
+                        validated_groups[unique_sig] = cluster
             return validated_groups
         else:
             # Return only groups with duplicates
             return {sig: txns for sig, txns in signature_groups.items() if len(txns) > 1}
     
-    def _validate_date_tolerance_in_group(self, transactions: List[Transaction]) -> List[Transaction]:
+    def _validate_date_tolerance_in_group(self, transactions: List[Transaction]) -> Dict[str, List[Transaction]]:
         """
-        Validate that transactions in a group are within date tolerance of each other
+        Cluster transactions by date proximity and return groups of duplicates.
+        
+        Transactions with the same signature but different dates (beyond tolerance)
+        are separate transactions, not duplicates. This method clusters them
+        so that only transactions within date_tolerance_days of each other
+        are considered duplicates.
         
         Args:
             transactions: List of transactions with the same signature
             
         Returns:
-            List of transactions that are within date tolerance of each other
+            Dictionary mapping sub-signature to list of duplicate transactions
         """
         if len(transactions) <= 1:
-            return transactions
+            return {}
         
-        # For simplicity, check if all transactions are within tolerance of the first one
-        # In a more sophisticated implementation, we could do clustering
-        reference_txn = transactions[0]
-        valid_group = [reference_txn]
+        # Sort by date for clustering
+        sorted_txns = sorted(transactions, key=lambda t: t.date)
         
-        for txn in transactions[1:]:
-            date_diff = abs((txn.date - reference_txn.date).days)
-            if date_diff <= self.date_tolerance_days:
-                valid_group.append(txn)
+        # Cluster transactions by date proximity
+        clusters = []
+        current_cluster = [sorted_txns[0]]
         
-        return valid_group
+        for txn in sorted_txns[1:]:
+            # Check if this transaction is within tolerance of any in current cluster
+            in_cluster = False
+            for cluster_txn in current_cluster:
+                date_diff = abs((txn.date - cluster_txn.date).days)
+                if date_diff <= self.date_tolerance_days:
+                    in_cluster = True
+                    break
+            
+            if in_cluster:
+                current_cluster.append(txn)
+            else:
+                # Start a new cluster
+                if len(current_cluster) > 1:
+                    clusters.append(current_cluster)
+                current_cluster = [txn]
+        
+        # Don't forget the last cluster
+        if len(current_cluster) > 1:
+            clusters.append(current_cluster)
+        
+        # Convert clusters to dictionary with unique sub-signatures
+        result = {}
+        for i, cluster in enumerate(clusters):
+            # Use the first transaction's date to create a unique sub-signature
+            sub_sig = f"cluster_{cluster[0].date.strftime('%Y%m%d')}_{i}"
+            result[sub_sig] = cluster
+        
+        return result
     
     def merge_duplicate_transactions(self, duplicate_groups: Dict[str, List[Transaction]]) -> List[Transaction]:
         """

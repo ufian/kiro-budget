@@ -13,6 +13,8 @@ from .utils.processing_tracker import ProcessingTracker
 from .utils.error_handler import ErrorHandler
 from .utils.csv_writer import CSVWriter
 from .utils.validation import ValidationEngine
+from .utils.account_config import AccountConfigLoader
+from .utils.account_enricher import AccountEnricher
 from .models.core import ParserConfig, Transaction
 
 
@@ -40,6 +42,13 @@ class FinancialDataParserCLI:
         self.parser_factory = ParserFactory(self.config)
         self.csv_writer = CSVWriter(self.config)
         self.validation_engine = ValidationEngine()
+        
+        # Initialize account enrichment (Requirements 3.1, 3.2)
+        # Load account config from raw/accounts.yaml
+        accounts_config_path = os.path.join(self.config.raw_directory, 'accounts.yaml')
+        self.account_config_loader = AccountConfigLoader(accounts_config_path)
+        self.account_config_loader.load()
+        self.account_enricher = AccountEnricher(self.account_config_loader)
     
     def process_files(self, 
                      file_paths: Optional[List[str]] = None,
@@ -263,9 +272,13 @@ class FinancialDataParserCLI:
                     # Ensure output directory exists
                     os.makedirs(os.path.dirname(output_file), exist_ok=True)
                     
-                    success = self.csv_writer.write_transactions(transactions, output_file)
+                    # Enrich transactions with account metadata before CSV export
+                    # (Requirements 3.1, 3.2)
+                    enriched_transactions = self.account_enricher.enrich_batch(transactions)
+                    
+                    success = self.csv_writer.write_transactions(enriched_transactions, output_file)
                     if success:
-                        self.error_handler.log_info(f"Wrote {len(transactions)} transactions to {output_file}")
+                        self.error_handler.log_info(f"Wrote {len(enriched_transactions)} transactions to {output_file}")
                     else:
                         error_msg = f"Failed to write output file for {file_path}"
                         errors.append(error_msg)
@@ -418,8 +431,17 @@ class FinancialDataParserCLI:
                     'transaction_count': 0
                 }
         
+        # Enrich all transactions with account metadata before writing
+        # (Requirements 3.1, 3.2)
+        enriched_transactions_by_file = {}
+        for file_path, transactions in transactions_by_file.items():
+            if transactions:
+                enriched_transactions_by_file[file_path] = self.account_enricher.enrich_batch(transactions)
+            else:
+                enriched_transactions_by_file[file_path] = []
+        
         # Now write with duplicate detection and merging
-        write_results = self.csv_writer.write_multiple_files(transactions_by_file)
+        write_results = self.csv_writer.write_multiple_files(enriched_transactions_by_file)
         
         # Combine parse and write results
         final_results = {}
@@ -1204,6 +1226,206 @@ def batch_process(ctx, show_progress, batch_size):
             
     except Exception as e:
         click.echo(f"✗ Error during batch processing: {str(e)}")
+        sys.exit(1)
+
+
+@cli.command('import')
+@click.option('--data-dir', '-d', default='data',
+              help='Data directory containing processed CSV files (default: data)')
+@click.option('--output-dir', '-o', default='data/total',
+              help='Output directory for consolidated file (default: data/total)')
+@click.pass_context
+def import_transactions(ctx, data_dir, output_dir):
+    """Import and consolidate all processed transaction CSV files.
+    
+    Scans all subdirectories of the data directory for CSV files,
+    deduplicates transactions across files, and writes a single
+    consolidated file to data/total/all_transactions.csv.
+    
+    Requirements: 4.1, 4.2, 4.3, 4.4
+    """
+    from .utils.importer import TransactionImporter, ImportError as ImportErr
+    
+    click.echo("Starting transaction import...")
+    
+    try:
+        importer = TransactionImporter(
+            data_directory=data_dir,
+            output_directory=output_dir
+        )
+        
+        result = importer.import_all()
+        
+        if result.success:
+            click.echo(f"✓ Import completed successfully")
+            click.echo(f"  Source files processed: {result.source_files_count}")
+            click.echo(f"  Total input transactions: {result.total_input_transactions}")
+            click.echo(f"  Duplicates removed: {result.duplicates_removed}")
+            click.echo(f"  Final transaction count: {result.final_transaction_count}")
+            if result.output_file:
+                click.echo(f"  Output file: {result.output_file}")
+            
+            # Show warnings if any
+            for warning in result.warnings:
+                click.echo(f"  ⚠ {warning}")
+        else:
+            click.echo(f"✗ Import failed")
+            for error in result.errors:
+                click.echo(f"  Error: {error}")
+            sys.exit(1)
+            
+    except ImportErr as e:
+        click.echo(f"✗ Import error: {str(e)}")
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"✗ Unexpected error: {str(e)}")
+        sys.exit(1)
+
+
+@cli.command('generate-accounts-template')
+@click.option('--output', '-o', default=None, 
+              help='Output path for template file (default: raw/accounts.yaml.example)')
+@click.option('--force', '-f', is_flag=True, 
+              help='Overwrite existing file without confirmation')
+@click.pass_context
+def generate_accounts_template(ctx, output, force):
+    """Generate a sample accounts.yaml configuration template.
+    
+    Creates a template file with examples for multiple institutions and
+    comments explaining each configuration option. The template demonstrates
+    how to configure account names and types for transaction enrichment.
+    
+    Requirements: 5.1, 5.2, 5.3
+    """
+    cli_instance = ctx.obj['cli']
+    
+    # Default output path
+    if output is None:
+        output = os.path.join(cli_instance.config.raw_directory, 'accounts.yaml.example')
+    
+    # Check if file exists
+    if os.path.exists(output) and not force:
+        click.echo(f"⚠ File already exists: {output}")
+        if not click.confirm("Do you want to overwrite it?"):
+            click.echo("Aborted.")
+            return
+    
+    # Generate template content with comprehensive comments
+    template_content = """# Account Configuration File
+# ========================
+# This file defines human-readable names and types for your financial accounts.
+# Place this file at raw/accounts.yaml after customizing it for your accounts.
+#
+# The parser uses this configuration to enrich transactions with:
+#   - account_name: A friendly name for the account (e.g., "Main Checking")
+#   - account_type: Either "debit" (checking/savings) or "credit" (credit cards)
+#
+# Structure:
+#   <institution>:        # Institution name (matches folder name in raw/)
+#     "<account_id>":     # Account ID (last 4 digits or unique identifier)
+#       account_name: ""  # Required: Human-readable account name
+#       account_type: ""  # Required: "debit" or "credit"
+#       description: ""   # Optional: Additional notes about the account
+
+# ============================================================================
+# First Tech Federal Credit Union Example
+# ============================================================================
+# Institution name should match the folder name in raw/ (e.g., raw/firsttech/)
+firsttech:
+  # Account ID is typically the last 4 digits of the account number
+  # Quote the ID to ensure it's treated as a string (important for IDs starting with 0)
+  "0125":
+    account_name: "Primary Savings"
+    account_type: debit
+    description: "Emergency fund - 6 months expenses"
+  
+  "0547":
+    account_name: "Main Checking"
+    account_type: debit
+    # description is optional and can be omitted
+  
+  "0854":
+    account_name: "Joint Savings"
+    account_type: debit
+    description: "Shared savings with spouse"
+
+# ============================================================================
+# Chase Bank Example
+# ============================================================================
+chase:
+  "4521":
+    account_name: "Sapphire Preferred"
+    account_type: credit
+    description: "Travel rewards card - primary spending"
+  
+  "8147":
+    account_name: "Freedom Unlimited"
+    account_type: credit
+    description: "Cash back card - everyday purchases"
+  
+  "2234":
+    account_name: "Business Checking"
+    account_type: debit
+
+# ============================================================================
+# Gemini (Cryptocurrency Exchange) Example
+# ============================================================================
+gemini:
+  "main":
+    account_name: "Crypto Trading"
+    account_type: debit
+    description: "Cryptocurrency exchange account"
+
+# ============================================================================
+# Adding Your Own Accounts
+# ============================================================================
+# To add your own accounts:
+#
+# 1. Create a section for each institution (use lowercase, match folder name)
+# 2. Add each account with its ID (usually last 4 digits)
+# 3. Set account_name to something meaningful to you
+# 4. Set account_type to "debit" or "credit"
+# 5. Optionally add a description for your reference
+#
+# Example for a new institution:
+#
+# bankofamerica:
+#   "1234":
+#     account_name: "Personal Checking"
+#     account_type: debit
+#   "5678":
+#     account_name: "Cash Rewards Visa"
+#     account_type: credit
+#
+# ============================================================================
+# Notes
+# ============================================================================
+# - Account IDs should be quoted (e.g., "0547") to preserve leading zeros
+# - Institution names are case-sensitive and should match folder names
+# - If an account is not configured, the raw account ID will be used as the name
+#   and "debit" will be used as the default type
+# - Invalid account_type values will default to "debit" with a warning
+"""
+    
+    try:
+        # Ensure directory exists
+        output_dir = os.path.dirname(output)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+        
+        # Write template file
+        with open(output, 'w', encoding='utf-8') as f:
+            f.write(template_content)
+        
+        click.echo(f"✓ Account configuration template generated: {output}")
+        click.echo()
+        click.echo("Next steps:")
+        click.echo(f"  1. Copy the template: cp {output} {output.replace('.example', '')}")
+        click.echo("  2. Edit the file to add your actual accounts")
+        click.echo("  3. Run 'kiro-budget process' to use the configuration")
+        
+    except Exception as e:
+        click.echo(f"✗ Error generating template: {str(e)}")
         sys.exit(1)
 
 

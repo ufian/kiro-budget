@@ -29,7 +29,8 @@ class CSVParser(FileParser):
                 'date', 'transaction_date', 'posting_date', 'Date', 'Transaction Date',
                 'Posting Date', 'trans_date', 'Trans Date', 'DATE', 'TRANSACTION_DATE',
                 'transaction date', 'posting date', 'effective_date', 'Effective Date',
-                'Transaction Post Date', 'transaction post date', 'TRANSACTION POST DATE'
+                'Transaction Post Date', 'transaction post date', 'TRANSACTION POST DATE',
+                'Started Date', 'started date', 'Completed Date', 'completed date'
             ],
             'amount': [
                 'amount', 'Amount', 'transaction_amount', 'debit_credit', 'Debit', 'Credit',
@@ -40,11 +41,13 @@ class CSVParser(FileParser):
                 'description', 'Description', 'memo', 'details', 'Memo', 'Details',
                 'DESCRIPTION', 'MEMO', 'DETAILS', 'transaction_description', 'payee',
                 'Payee', 'merchant', 'Merchant', 'reference', 'Reference', 'narration',
-                'Description of Transaction', 'description of transaction', 'DESCRIPTION OF TRANSACTION'
+                'Description of Transaction', 'description of transaction', 'DESCRIPTION OF TRANSACTION',
+                'Transaction Description', 'transaction description', 'TRANSACTION DESCRIPTION'
             ],
             'account': [
                 'account', 'Account', 'account_number', 'Account Number', 'ACCOUNT',
-                'ACCOUNT_NUMBER', 'account number', 'acct', 'Acct', 'account_id', 'Account ID'
+                'ACCOUNT_NUMBER', 'account number', 'acct', 'Acct', 'account_id', 'Account ID',
+                'Product', 'product', 'PRODUCT'
             ],
             'transaction_id': [
                 'transaction_id', 'Transaction ID', 'id', 'ID', 'trans_id', 'Trans ID',
@@ -54,6 +57,10 @@ class CSVParser(FileParser):
             'balance': [
                 'balance', 'Balance', 'running_balance', 'Running Balance', 'BALANCE',
                 'account_balance', 'Account Balance', 'current_balance', 'Current Balance'
+            ],
+            'transaction_type': [
+                'transaction_type', 'Transaction Type', 'type', 'Type', 'trans_type',
+                'TRANSACTION_TYPE', 'TYPE', 'transaction type'
             ]
         }
     
@@ -161,7 +168,7 @@ class CSVParser(FileParser):
                         break
         
         # Map other fields (date, description, etc.) regardless of debit/credit detection
-        for field in ['date', 'description', 'account', 'transaction_id', 'balance']:
+        for field in ['date', 'description', 'account', 'transaction_id', 'balance', 'transaction_type']:
             if field not in mapping:
                 possible_names = self.column_mappings.get(field, [])
                 for header in headers:
@@ -226,8 +233,15 @@ class CSVParser(FileParser):
             
             # Extract description
             desc_col = column_mapping.get('description')
-            if not desc_col or pd.isna(row[desc_col]):
-                description = "Unknown transaction"
+            if not desc_col or pd.isna(row[desc_col]) or str(row[desc_col]).strip() == '':
+                # If description is empty, try to use transaction_type as fallback
+                type_col = column_mapping.get('transaction_type')
+                if type_col and not pd.isna(row[type_col]):
+                    trans_type = str(row[type_col]).strip()
+                    # Make transaction type more readable (e.g., "payment_transaction" -> "Payment Transaction")
+                    description = trans_type.replace('_', ' ').title()
+                else:
+                    description = "Unknown transaction"
             else:
                 description = self.transformer.clean_description(str(row[desc_col]))
             

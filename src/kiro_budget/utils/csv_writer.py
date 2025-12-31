@@ -4,8 +4,8 @@ import os
 import csv
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from ..models.core import Transaction, ParserConfig, ProcessingResult
+from typing import List, Dict, Optional, Tuple, Union
+from ..models.core import Transaction, EnrichedTransaction, ParserConfig, ProcessingResult
 from .duplicate_detector import DuplicateDetector, TransactionMerger
 
 
@@ -13,7 +13,23 @@ class CSVWriter:
     """Handles CSV output with standardized formatting and organization"""
     
     # Standard CSV column headers in the unified format
+    # New columns (account_name, account_type) are placed after 'account' column
+    # per Requirements 4.1, 4.2, 4.3, 4.4
     STANDARD_HEADERS = [
+        'date',
+        'amount', 
+        'description',
+        'account',
+        'account_name',
+        'account_type',
+        'institution',
+        'transaction_id',
+        'category',
+        'balance'
+    ]
+    
+    # Legacy headers for backward compatibility (without enrichment columns)
+    LEGACY_HEADERS = [
         'date',
         'amount', 
         'description',
@@ -29,16 +45,27 @@ class CSVWriter:
         self.duplicate_detector = DuplicateDetector()
         self.transaction_merger = TransactionMerger(self.duplicate_detector)
     
-    def write_transactions(self, transactions: List[Transaction], output_path: str) -> bool:
+    def write_transactions(
+        self, 
+        transactions: List[Union[Transaction, EnrichedTransaction]], 
+        output_path: str
+    ) -> bool:
         """
         Write transactions to CSV file with standardized format
         
+        Supports both Transaction and EnrichedTransaction objects.
+        When EnrichedTransaction objects are provided, includes account_name
+        and account_type columns. For regular Transaction objects, these
+        columns will contain default values.
+        
         Args:
-            transactions: List of Transaction objects to write
+            transactions: List of Transaction or EnrichedTransaction objects to write
             output_path: Path where CSV file should be written
             
         Returns:
             True if successful, False otherwise
+            
+        Requirements: 4.1, 4.2, 4.3, 4.4
         """
         if not transactions:
             return False
@@ -263,11 +290,16 @@ class CSVWriter:
         """
         Validate generated CSV file for data integrity
         
+        Validates that the CSV file has the correct headers (including
+        account_name and account_type columns) and valid data.
+        
         Args:
             csv_path: Path to CSV file to validate
             
         Returns:
             List of validation errors (empty if valid)
+            
+        Requirements: 4.1, 4.2, 4.3, 4.4
         """
         errors = []
         
@@ -279,9 +311,10 @@ class CSVWriter:
             with open(csv_path, 'r', encoding='utf-8') as csvfile:
                 reader = csv.DictReader(csvfile)
                 
-                # Check headers
+                # Check headers - accept both standard and legacy formats
                 if reader.fieldnames != self.STANDARD_HEADERS:
-                    errors.append(f"Invalid headers. Expected: {self.STANDARD_HEADERS}, Got: {reader.fieldnames}")
+                    if reader.fieldnames != self.LEGACY_HEADERS:
+                        errors.append(f"Invalid headers. Expected: {self.STANDARD_HEADERS}, Got: {reader.fieldnames}")
                 
                 row_count = 0
                 for row_num, row in enumerate(reader, start=2):  # Start at 2 (after header)
@@ -310,6 +343,11 @@ class CSVWriter:
                             float(row['amount'])
                         except ValueError:
                             errors.append(f"Row {row_num}: Invalid amount format: {row['amount']}")
+                    
+                    # Validate account_type if present (should be 'debit' or 'credit')
+                    account_type = row.get('account_type')
+                    if account_type and account_type not in ('debit', 'credit'):
+                        errors.append(f"Row {row_num}: Invalid account_type: {account_type} (expected 'debit' or 'credit')")
                 
                 if row_count == 0:
                     errors.append("CSV file contains no data rows")
@@ -346,13 +384,44 @@ class CSVWriter:
         except (OSError, PermissionError):
             return False
     
-    def _transaction_to_dict(self, transaction: Transaction) -> Dict[str, str]:
-        """Convert Transaction object to dictionary for CSV writing"""
+    def _transaction_to_dict(
+        self, 
+        transaction: Union[Transaction, EnrichedTransaction]
+    ) -> Dict[str, str]:
+        """Convert Transaction or EnrichedTransaction object to dictionary for CSV writing.
+        
+        Handles both Transaction and EnrichedTransaction objects. For regular
+        Transaction objects, account_name defaults to the raw account value
+        and account_type defaults to "debit".
+        
+        Args:
+            transaction: Transaction or EnrichedTransaction object
+            
+        Returns:
+            Dictionary with all CSV column values as strings
+            
+        Requirements: 4.1, 4.2, 4.3, 4.4
+        """
+        # Check if this is an EnrichedTransaction
+        is_enriched = isinstance(transaction, EnrichedTransaction)
+        
+        # Get account_name and account_type from EnrichedTransaction,
+        # or use defaults for regular Transaction
+        if is_enriched:
+            account_name = transaction.account_name
+            account_type = transaction.account_type
+        else:
+            # Default behavior for non-enriched transactions
+            account_name = transaction.account or ''
+            account_type = 'debit'
+        
         return {
             'date': transaction.date.strftime('%Y-%m-%d'),
             'amount': str(transaction.amount),
             'description': transaction.description or '',
             'account': transaction.account or '',
+            'account_name': account_name,
+            'account_type': account_type,
             'institution': transaction.institution or '',
             'transaction_id': transaction.transaction_id or '',
             'category': transaction.category or '',

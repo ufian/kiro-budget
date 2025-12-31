@@ -7,6 +7,8 @@ from .config_manager import ConfigManager, get_default_config_manager
 from .plugin_manager import PluginManager, ParserPlugin, SimpleParserPlugin
 from .error_handler import ErrorHandler, ErrorCategory, ErrorSeverity, handle_file_access_error, handle_parsing_error, handle_validation_error
 from .processing_tracker import ProcessingTracker, BatchProcessingSummary, FileProcessingState
+from .account_config import AccountConfigLoader
+from .account_enricher import AccountEnricher
 
 __all__ = [
     'ValidationEngine',
@@ -28,5 +30,7 @@ __all__ = [
     'handle_validation_error',
     'ProcessingTracker',
     'BatchProcessingSummary',
-    'FileProcessingState'
+    'FileProcessingState',
+    'AccountConfigLoader',
+    'AccountEnricher'
 ]

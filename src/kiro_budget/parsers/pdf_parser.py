@@ -23,6 +23,11 @@ class PDFParser(FileParser):
         self.supported_extensions = ['.pdf']
         self.transformer = DataTransformer(config)
         
+        # Statement period info extracted from the PDF
+        self.statement_start_date = None
+        self.statement_end_date = None
+        self.statement_year = None
+        
         # Common patterns for identifying transaction data
         self.date_patterns = [
             r'\b\d{1,2}/\d{1,2}/\d{4}\b',  # MM/DD/YYYY or M/D/YYYY
@@ -33,6 +38,18 @@ class PDFParser(FileParser):
         self.amount_patterns = [
             r'\$?\s*\d{1,3}(?:,\d{3})*\.\d{2}',  # $1,234.56 or 1,234.56
             r'\(\$?\s*\d{1,3}(?:,\d{3})*\.\d{2}\)',  # ($1,234.56) for negative
+        ]
+        
+        # Patterns for extracting statement period
+        self.statement_period_patterns = [
+            # "Opening/Closing Date 11/19/23 - 12/18/23"
+            r'Opening/Closing Date\s+(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
+            # "Statement Period: 11/19/2023 - 12/18/2023"
+            r'Statement Period[:\s]+(\d{1,2}/\d{1,2}/\d{2,4})\s*[-–]\s*(\d{1,2}/\d{1,2}/\d{2,4})',
+            # "Statement Date: 12/18/2023"
+            r'Statement Date[:\s]+(\d{1,2}/\d{1,2}/\d{2,4})',
+            # "Closing Date 12/18/23"
+            r'Closing Date\s+(\d{1,2}/\d{1,2}/\d{2,4})',
         ]
     
     def get_supported_extensions(self) -> List[str]:
@@ -73,6 +90,11 @@ class PDFParser(FileParser):
                 # Extract institution and account info from file path
                 institution = self.transformer.extract_institution(file_path)
                 
+                # First, extract statement period from the first page
+                if pdf.pages:
+                    first_page_text = pdf.pages[0].extract_text() or ""
+                    self._extract_statement_period(first_page_text, file_path)
+                
                 # Process all pages
                 for page_num, page in enumerate(pdf.pages, 1):
                     logger.debug(f"Processing page {page_num} of {file_path}")
@@ -91,8 +113,97 @@ class PDFParser(FileParser):
         except Exception as e:
             logger.error(f"Error parsing PDF file {file_path}: {e}")
             # Don't raise exception - return empty list and let error handling deal with it
+        finally:
+            # Reset statement period for next file
+            self.statement_start_date = None
+            self.statement_end_date = None
+            self.statement_year = None
             
         return transactions
+    
+    def _extract_statement_period(self, text: str, file_path: str):
+        """Extract statement period dates from PDF text"""
+        if not text:
+            return
+        
+        for pattern in self.statement_period_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                
+                if len(groups) >= 2:
+                    # We have start and end dates
+                    start_str, end_str = groups[0], groups[1]
+                    self.statement_start_date = self._parse_statement_date(start_str)
+                    self.statement_end_date = self._parse_statement_date(end_str)
+                elif len(groups) == 1:
+                    # We only have end/closing date
+                    self.statement_end_date = self._parse_statement_date(groups[0])
+                
+                # Set statement year from end date (most reliable)
+                if self.statement_end_date:
+                    self.statement_year = self.statement_end_date.year
+                    logger.info(f"Extracted statement period: {self.statement_start_date} to {self.statement_end_date} (year: {self.statement_year})")
+                    return
+        
+        # Try to extract year from filename as fallback (e.g., 20231218-statements-8147-.pdf)
+        filename_match = re.search(r'(\d{4})(\d{2})(\d{2})', file_path)
+        if filename_match:
+            year = int(filename_match.group(1))
+            if 2000 <= year <= 2100:  # Sanity check
+                self.statement_year = year
+                logger.info(f"Extracted year from filename: {self.statement_year}")
+    
+    def _parse_statement_date(self, date_str: str) -> Optional[datetime]:
+        """Parse a date string from statement period"""
+        if not date_str:
+            return None
+        
+        # Try different formats
+        formats = [
+            '%m/%d/%Y',   # 12/18/2023
+            '%m/%d/%y',   # 12/18/23
+            '%m-%d-%Y',   # 12-18-2023
+            '%m-%d-%y',   # 12-18-23
+        ]
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str.strip(), fmt)
+            except ValueError:
+                continue
+        
+        return None
+    
+    def _get_year_for_transaction_date(self, month: int, day: int) -> int:
+        """Determine the correct year for a transaction date (MM/DD format)
+        
+        Uses statement period to determine the year. Handles year boundaries
+        (e.g., statement from 11/19/23 to 12/18/23 - all dates are in 2023).
+        """
+        if self.statement_year:
+            # If we have statement period with both dates, use them to determine year
+            if self.statement_start_date and self.statement_end_date:
+                start_month = self.statement_start_date.month
+                end_month = self.statement_end_date.month
+                
+                # Check if statement spans year boundary (e.g., Dec to Jan)
+                if start_month > end_month:
+                    # Statement spans year boundary
+                    if month >= start_month:
+                        # Transaction is in the start year
+                        return self.statement_start_date.year
+                    else:
+                        # Transaction is in the end year
+                        return self.statement_end_date.year
+                else:
+                    # Statement is within same year
+                    return self.statement_year
+            else:
+                return self.statement_year
+        
+        # Fallback to current year
+        return datetime.now().year
     
     def _extract_from_tables(self, page, file_path: str, institution: str) -> List[Transaction]:
         """Extract transactions from PDF tables"""
@@ -280,10 +391,13 @@ class PDFParser(FileParser):
             if chase_match:
                 date_str, description, amount_str = chase_match.groups()
                 
-                # Add current year to date (assuming current year for MM/DD format)
-                from datetime import datetime
-                current_year = datetime.now().year
-                date_str = f"{date_str}/{current_year}"
+                # Parse month/day and get correct year from statement period
+                date_parts = date_str.split('/')
+                if len(date_parts) == 2:
+                    month = int(date_parts[0])
+                    day = int(date_parts[1])
+                    year = self._get_year_for_transaction_date(month, day)
+                    date_str = f"{month}/{day}/{year}"
                 
                 date = self.transformer.normalize_date(date_str)
                 amount = self.transformer.normalize_amount(amount_str)
