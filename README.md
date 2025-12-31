@@ -1,16 +1,19 @@
 # Kiro Budget
 
-A comprehensive financial data parser and analysis tool that processes multiple file formats (QFX, PDF, CSV) from various financial institutions, automatically detects and removes duplicate transactions, and outputs clean, standardized CSV data.
+A comprehensive financial data parser and analysis tool that processes multiple file formats (QFX, PDF, CSV) from various financial institutions, automatically detects and removes duplicate transactions, enriches transactions with account metadata, and provides detailed financial reporting.
 
 ## Features
 
 - **Multi-Format Support**: Parse QFX/OFX, PDF statements, and CSV files
-- **Intelligent Duplicate Detection**: Automatically identifies and merges duplicate transactions across different file formats
-- **Institution Support**: Built-in support for Chase, First Tech, Gemini, and other major financial institutions
+- **Account Enrichment**: Automatically enriches transactions with account names and types (credit/debit) based on configuration
+- **Intelligent Duplicate Detection**: Automatically identifies and merges duplicate transactions across different file formats while preserving enrichment data
+- **Institution Support**: Built-in support for Chase, First Tech, Gemini, Apple Card, Revolut, Discover, and other major financial institutions
+- **Transaction Import & Consolidation**: Consolidates all processed transactions into a unified dataset with deduplication
+- **Monthly Reporting**: Generates detailed HTML reports with spending analysis, proper credit/debit handling, and year-over-year grouping
 - **Plugin System**: Extensible architecture for adding custom parsers and processors
 - **Data Validation**: Comprehensive validation and error handling
 - **Batch Processing**: Process multiple files simultaneously with progress tracking
-- **Standardized Output**: Unified CSV format with consistent field mapping
+- **Standardized Output**: Unified CSV format with consistent field mapping and account metadata
 
 ## Quick Start
 
@@ -33,7 +36,31 @@ pip install -r requirements-dev.txt
 pip install -e .
 ```
 
-### 2. Prepare Your Data
+### 2. Configure Accounts
+
+Create an account configuration file at `raw/accounts.yaml` to define your account names and types:
+
+```yaml
+# Account Configuration
+chase:
+  "8147":
+    account_name: "Chase Sapphire"
+    account_type: credit
+
+firsttech:
+  "0547":
+    account_name: "Main Checking"
+    account_type: debit
+
+gemini:
+  "unknown":
+    account_name: "Gemini Trading"
+    account_type: credit
+```
+
+This configuration ensures transactions are properly categorized as credit or debit accounts, which is essential for accurate financial reporting.
+
+### 3. Prepare Your Data
 
 Place your financial data files in the `raw/` directory organized by institution:
 
@@ -49,7 +76,7 @@ raw/
     └── trading_history.csv
 ```
 
-### 3. Process Your Data
+### 4. Process Your Data
 
 ```bash
 # Process all files in the raw directory
@@ -67,6 +94,32 @@ python -m kiro_budget.cli process --force
 # Generate processing report
 python -m kiro_budget.cli process -r processing_report.json
 ```
+
+### 5. Import and Consolidate Transactions
+
+After processing individual files, consolidate all transactions into a unified dataset:
+
+```bash
+# Import and deduplicate all processed transactions
+python -m kiro_budget.cli import
+```
+
+This creates `data/total/all_transactions.csv` with all transactions deduplicated and enriched with account metadata.
+
+### 6. Generate Reports
+
+Create detailed financial reports:
+
+```bash
+# Generate monthly summary report
+python scripts/analysis/monthly_summary_report.py
+```
+
+This creates an HTML report at `data/reports/monthly_summary.html` with:
+- Monthly spending and income breakdown
+- Proper credit/debit account handling
+- Year-over-year grouping
+- Color-coded spending (red) vs income (green)
 
 ## Usage Guide
 
@@ -88,6 +141,14 @@ Options:
 - `--force`: Force reprocessing of previously processed files
 - `--no-recursive`: Disable recursive directory scanning
 - `-r, --report TEXT`: Save processing report to specified file
+
+**`import`** - Import and consolidate all processed transactions
+
+This command:
+- Scans all processed CSV files in `data/` subdirectories
+- Deduplicates transactions across files using fuzzy matching
+- Preserves account enrichment data (account names and types)
+- Creates consolidated output at `data/total/all_transactions.csv`
 
 #### Examples
 
@@ -133,29 +194,73 @@ python -m kiro_budget.cli process --no-recursive
 All processed transactions are output in a standardized CSV format:
 
 ```csv
-date,amount,description,account,institution,transaction_id,category,balance
-2024-01-15,-52.20,AMAZON MKTPL*ABC123,1234,Chase,20240115123456789,,
-2024-01-16,1500.00,PAYROLL DEPOSIT,1234,Chase,20240116987654321,,
+date,amount,description,account,account_name,account_type,institution,transaction_id,category,balance
+2024-01-15,-52.20,AMAZON MKTPL*ABC123,8147,Chase Sapphire,credit,Chase,20240115123456789,,
+2024-01-16,1500.00,PAYROLL DEPOSIT,0547,Main Checking,debit,Firsttech,20240116987654321,,
 ```
 
 **Fields:**
 - `date`: Transaction date (YYYY-MM-DD)
 - `amount`: Transaction amount (negative for debits, positive for credits)
 - `description`: Transaction description/merchant name
-- `account`: Account identifier
+- `account`: Account identifier (last 4 digits or account code)
+- `account_name`: Human-readable account name from configuration
+- `account_type`: Account type (`credit` or `debit`) from configuration
 - `institution`: Financial institution name
 - `transaction_id`: Unique transaction ID (when available)
 - `category`: Transaction category (optional)
 - `balance`: Account balance after transaction (when available)
 
+### Account Configuration
+
+Configure your accounts in `raw/accounts.yaml` to enable proper transaction enrichment:
+
+```yaml
+# Account Configuration File
+# institution_name:
+#   "account_id":
+#     account_name: "Display Name"
+#     account_type: credit|debit
+
+chase:
+  "8147":
+    account_name: "Chase Sapphire"
+    account_type: credit
+
+firsttech:
+  "0547":
+    account_name: "Main Checking"
+    account_type: debit
+  "0596":
+    account_name: "Savings"
+    account_type: debit
+
+gemini:
+  "unknown":  # Gemini CSV files don't include account IDs
+    account_name: "Gemini Trading"
+    account_type: credit
+
+apple:
+  "75e0e545-fb91-45d4-836":
+    account_name: "Apple Card"
+    account_type: credit
+```
+
+**Important Notes:**
+- `account_type: credit` for credit cards, loans, and trading accounts
+- `account_type: debit` for checking, savings, and cash accounts
+- Account IDs should match what appears in your transaction files
+- Some institutions (like Gemini) use "unknown" as the account ID
+
 ### Duplicate Detection
 
-The tool automatically detects and removes duplicate transactions using:
+The tool automatically detects and removes duplicate transactions while preserving account enrichment data using:
 
 - **Transaction IDs**: Exact matching for QFX/OFX files
 - **Fuzzy Matching**: Amount + description + date tolerance for cross-format detection
 - **Date Tolerance**: 3-day window to handle posting vs transaction date differences
 - **Description Normalization**: Handles merchant name variations and location differences
+- **Enrichment Preservation**: Maintains account names and types through the deduplication process
 
 ### Configuration
 
@@ -174,6 +279,8 @@ Create a `config.json` file to customize behavior:
   }
 }
 ```
+
+See `docs/accounts_configuration.md` for detailed account configuration documentation.
 
 #### Plugin System
 
@@ -207,14 +314,49 @@ raw/
 ```
 data/
 ├── chase/
-│   └── chase_1234_20240101_20240131.csv
+│   └── chase_8147_20240101_20240131.csv
 ├── firsttech/
-│   └── firsttech_5678_20240101_20240131.csv
+│   └── firsttech_0547_20240101_20240131.csv
+├── total/
+│   └── all_transactions.csv              # Consolidated transactions
 └── reports/
-    └── processing_report_20240201.json
+    ├── monthly_summary.html              # Monthly spending report
+    └── processing_report_20240201.json   # Processing statistics
 ```
 
 ## Advanced Usage
+
+### Transaction Import and Consolidation
+
+Import and consolidate all processed transactions:
+
+```bash
+# Import all processed CSV files into consolidated dataset
+python -m kiro_budget.cli import
+```
+
+This command:
+- Scans all institution directories in `data/` for CSV files
+- Loads and validates transaction data
+- Performs cross-file duplicate detection using fuzzy matching
+- Preserves account enrichment data through deduplication
+- Outputs consolidated file to `data/total/all_transactions.csv`
+
+### Financial Reporting
+
+Generate comprehensive financial reports:
+
+```bash
+# Generate monthly summary HTML report
+python scripts/analysis/monthly_summary_report.py
+```
+
+The monthly report includes:
+- **Monthly Breakdown**: Income vs spending by month
+- **Account Type Handling**: Proper credit/debit account classification
+- **Year Grouping**: Transactions grouped by year with subtotals
+- **Color Coding**: Red for spending, green for income/credits
+- **Sign Convention**: Negative amounts = money out, positive = money in
 
 ### Batch Processing
 
@@ -239,17 +381,17 @@ The tool provides comprehensive error handling and logging:
 
 ### Analysis Scripts
 
-Use the included analysis scripts for debugging and investigation:
+Use the included analysis scripts for debugging and financial analysis:
 
 ```bash
-# Debug parser behavior
-python scripts/analysis/debug_parsers.py
+# Generate monthly spending report
+python scripts/analysis/monthly_summary_report.py
 
-# Test duplicate detection
-python scripts/analysis/debug_duplicates.py
+# Find potential transfer pairs between accounts
+python scripts/analysis/find_transfer_pairs.py
 
-# Analyze PDF structure
-python scripts/analysis/debug_pdf_content.py
+# Debug duplicate detection
+python scripts/analysis/debug_dedup.py
 ```
 
 ## Development
@@ -291,17 +433,21 @@ kiro-budget/
 │   │   ├── csv_parser.py     # CSV parser
 │   │   └── base.py           # Base parser classes
 │   ├── utils/                # Utility modules
+│   │   ├── account_config.py      # Account configuration loader
+│   │   ├── account_enricher.py    # Transaction enrichment
+│   │   ├── importer.py            # Transaction import & consolidation
 │   │   ├── duplicate_detector.py  # Duplicate detection
-│   │   ├── csv_writer.py     # CSV output handling
-│   │   ├── validation.py     # Data validation
-│   │   └── config_manager.py # Configuration management
+│   │   ├── csv_writer.py          # CSV output handling
+│   │   ├── validation.py          # Data validation
+│   │   └── config_manager.py      # Configuration management
 │   ├── models/               # Data models
 │   │   └── core.py           # Transaction and config models
 │   └── cli.py                # Command-line interface
 ├── tests/                    # Test files
-├── scripts/analysis/         # Analysis and debug scripts
+├── scripts/analysis/         # Analysis and reporting scripts
 ├── docs/                     # Documentation
 ├── examples/                 # Usage examples
+├── .kiro/specs/             # Feature specifications
 └── raw/                      # Raw financial data (gitignored)
 ```
 
@@ -319,10 +465,21 @@ kiro-budget/
 - Verify transaction amounts and descriptions are similar
 - Review duplicate detection logs for details
 
-**"PDF parsing failed"**
-- Ensure PDF is not password protected
-- Check PDF contains readable text (not scanned images)
-- Try different PDF files to isolate the issue
+**"Account enrichment not working"**
+- Ensure `raw/accounts.yaml` exists and is properly formatted
+- Check that institution names match directory names (case-insensitive)
+- Verify account IDs match what appears in transaction files
+- Run import command after updating account configuration
+
+**"Monthly report shows wrong account types"**
+- Check account_type in `raw/accounts.yaml` (should be "credit" or "debit")
+- Re-run the import command to regenerate consolidated transactions
+- Regenerate the monthly report after import
+
+**"Transactions missing after import"**
+- Check for CSV parsing errors in logs
+- Verify all institution directories are included in data/ scan
+- Look for malformed CSV rows (descriptions with unescaped commas)
 
 ### Getting Help
 
