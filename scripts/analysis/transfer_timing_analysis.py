@@ -81,6 +81,9 @@ def identify_transfer_transactions(transactions: list) -> list:
         'cardpymt',
         'applecard gsbank payment',
         'gsbank payment',
+        'chase credit crd epay',
+        'gemini cardpymt',
+        'discover payment',
     ]
     
     transfer_txns = []
@@ -92,18 +95,120 @@ def identify_transfer_transactions(transactions: list) -> list:
     return transfer_txns
 
 
+def find_credit_card_payment_pairs(transactions: list, max_days: int = 7) -> list:
+    """Find credit card payment pairs with more flexible matching.
+    
+    Looks for patterns like:
+    - Chase "Payment Thank You" → FirstTech "APPLECARD GSBANK PAYMENT"
+    - Gemini "Payment Transaction" → Discover "Gemini CardPymt"
+    """
+    credit_card_pairs = []
+    
+    # Define credit card payment patterns
+    payment_received_patterns = [
+        ('chase', 'payment thank you'),
+        ('gemini', 'payment transaction'),
+        ('apple', 'deposit internet transfer fr'),  # Apple Card payments
+    ]
+    
+    payment_sent_patterns = [
+        ('firsttech', 'applecard gsbank payment'),
+        ('firsttech', 'chase credit crd epay'),
+        ('discover', 'gemini cardpymt'),
+    ]
+    
+    # Find payment received transactions
+    payment_received = []
+    for txn in transactions:
+        if txn['amount'] > 0:  # Positive amount (money received)
+            desc_lower = txn['description'].lower()
+            inst_lower = txn['institution'].lower()
+            
+            for inst_pattern, desc_pattern in payment_received_patterns:
+                if inst_pattern in inst_lower and desc_pattern in desc_lower:
+                    payment_received.append(txn)
+                    break
+    
+    # Find payment sent transactions
+    payment_sent = []
+    for txn in transactions:
+        if txn['amount'] < 0:  # Negative amount (money sent)
+            desc_lower = txn['description'].lower()
+            inst_lower = txn['institution'].lower()
+            
+            for inst_pattern, desc_pattern in payment_sent_patterns:
+                if inst_pattern in inst_lower and desc_pattern in desc_lower:
+                    payment_sent.append(txn)
+                    break
+    
+    # Match payments with flexible amount and timing
+    matched_ids = set()
+    
+    for received_txn in payment_received:
+        if id(received_txn) in matched_ids:
+            continue
+            
+        best_match = None
+        best_score = 0
+        
+        for sent_txn in payment_sent:
+            if id(sent_txn) in matched_ids:
+                continue
+            
+            # Calculate days difference
+            days_diff = abs((received_txn['date'] - sent_txn['date']).days)
+            if days_diff > max_days:
+                continue
+            
+            # Calculate amount similarity (allow for small differences due to fees, etc.)
+            amount_diff = abs(received_txn['abs_amount'] - sent_txn['abs_amount'])
+            amount_ratio = amount_diff / max(received_txn['abs_amount'], sent_txn['abs_amount'])
+            
+            # Score the match (lower is better)
+            # Prioritize: exact amount match > close amount > timing
+            if amount_diff == 0:
+                score = days_diff  # Perfect amount match
+            elif amount_ratio < 0.05:  # Within 5%
+                score = days_diff + 10
+            elif amount_ratio < 0.10:  # Within 10%
+                score = days_diff + 20
+            else:
+                continue  # Too different
+            
+            if best_match is None or score < best_score:
+                best_match = sent_txn
+                best_score = score
+        
+        if best_match:
+            days_diff = abs((received_txn['date'] - best_match['date']).days)
+            credit_card_pairs.append((best_match, received_txn, days_diff))
+            matched_ids.add(id(received_txn))
+            matched_ids.add(id(best_match))
+    
+    return credit_card_pairs
+
+
 def find_transfer_pairs_with_timing(transactions: list, max_business_days: int = 3) -> tuple:
     """Find transfer pairs and analyze timing patterns.
     
     Returns:
-        (matched_pairs, unmatched_transfers, timing_stats)
+        (matched_pairs, unmatched_transfers, timing_stats, credit_card_pairs)
     """
     transfer_txns = identify_transfer_transactions(transactions)
     
-    # Group by absolute amount
+    # First, find credit card payment pairs with more flexible matching
+    credit_card_pairs = find_credit_card_payment_pairs(transactions, max_days=7)
+    credit_card_matched_ids = set()
+    for sent_txn, received_txn, _ in credit_card_pairs:
+        credit_card_matched_ids.add(id(sent_txn))
+        credit_card_matched_ids.add(id(received_txn))
+    
+    # Group by absolute amount for regular transfer matching
     amount_groups = defaultdict(list)
     for txn in transfer_txns:
-        amount_groups[str(txn['abs_amount'])].append(txn)
+        # Skip transactions already matched as credit card pairs
+        if id(txn) not in credit_card_matched_ids:
+            amount_groups[str(txn['abs_amount'])].append(txn)
     
     matched_pairs = []
     matched_txn_ids = set()
@@ -146,13 +251,13 @@ def find_transfer_pairs_with_timing(transactions: list, max_business_days: int =
                         timing_stats[days_diff] += 1
                         break
     
-    # Find unmatched transfers
+    # Find unmatched transfers (excluding credit card pairs)
     unmatched_transfers = [
         txn for txn in transfer_txns 
-        if id(txn) not in matched_txn_ids
+        if id(txn) not in matched_txn_ids and id(txn) not in credit_card_matched_ids
     ]
     
-    return matched_pairs, unmatched_transfers, timing_stats
+    return matched_pairs, unmatched_transfers, timing_stats, credit_card_pairs
 
 
 def analyze_cross_month_impacts(matched_pairs: list) -> dict:
@@ -191,24 +296,58 @@ def print_timing_analysis(transactions: list):
     print()
     
     # Find transfer pairs and timing data
-    matched_pairs, unmatched_transfers, timing_stats = find_transfer_pairs_with_timing(transactions)
+    matched_pairs, unmatched_transfers, timing_stats, credit_card_pairs = find_transfer_pairs_with_timing(transactions)
     
     # Overall statistics
     total_transfers = len(identify_transfer_transactions(transactions))
-    matched_count = len(matched_pairs) * 2  # Each pair represents 2 transactions
+    regular_matched_count = len(matched_pairs) * 2  # Each pair represents 2 transactions
+    credit_card_matched_count = len(credit_card_pairs) * 2
+    total_matched_count = regular_matched_count + credit_card_matched_count
     unmatched_count = len(unmatched_transfers)
     
     print(f"📊 OVERALL STATISTICS")
     print("-" * 40)
     print(f"Total transfer transactions: {total_transfers}")
-    print(f"Matched pairs: {len(matched_pairs)} pairs ({matched_count} transactions)")
+    print(f"Regular matched pairs: {len(matched_pairs)} pairs ({regular_matched_count} transactions)")
+    print(f"Credit card payment pairs: {len(credit_card_pairs)} pairs ({credit_card_matched_count} transactions)")
+    print(f"Total matched: {total_matched_count} transactions")
     print(f"Unmatched transfers: {unmatched_count}")
-    print(f"Match rate: {(matched_count / total_transfers * 100):.1f}%")
+    print(f"Match rate: {(total_matched_count / total_transfers * 100):.1f}%")
     print()
     
-    # Timing distribution
+    # Credit card payment pairs analysis
+    if credit_card_pairs:
+        print(f"💳 CREDIT CARD PAYMENT PAIRS")
+        print("-" * 40)
+        print(f"Found {len(credit_card_pairs)} credit card payment pairs:")
+        print()
+        
+        # Group by timing
+        cc_timing_stats = defaultdict(int)
+        for sent_txn, received_txn, days_diff in credit_card_pairs:
+            cc_timing_stats[days_diff] += 1
+        
+        print("Timing distribution:")
+        for days in sorted(cc_timing_stats.keys()):
+            count = cc_timing_stats[days]
+            percentage = (count / len(credit_card_pairs)) * 100
+            lag_desc = "Same day" if days == 0 else f"{days} day{'s' if days != 1 else ''}"
+            print(f"  {lag_desc:10}: {count:3d} pairs ({percentage:5.1f}%)")
+        print()
+        
+        # Show recent examples
+        print("Recent examples:")
+        recent_pairs = sorted(credit_card_pairs, key=lambda x: x[0]['date'], reverse=True)[:5]
+        for sent_txn, received_txn, days_diff in recent_pairs:
+            print(f"  {received_txn['date'].strftime('%Y-%m-%d')} +${received_txn['amount']:>8,.2f} "
+                  f"{received_txn['institution']:8} {received_txn['description'][:30]}")
+            print(f"  {sent_txn['date'].strftime('%Y-%m-%d')} -${sent_txn['abs_amount']:>8,.2f} "
+                  f"{sent_txn['institution']:8} {sent_txn['description'][:30]} ({days_diff} days)")
+            print()
+    
+    # Regular timing distribution
     if timing_stats:
-        print(f"⏱️  PROCESSING LAG DISTRIBUTION")
+        print(f"⏱️  REGULAR TRANSFER LAG DISTRIBUTION")
         print("-" * 40)
         total_pairs = sum(timing_stats.values())
         
@@ -219,8 +358,9 @@ def print_timing_analysis(transactions: list):
             print(f"{lag_desc:15}: {count:3d} pairs ({percentage:5.1f}%)")
         print()
     
-    # Cross-month impact analysis
-    cross_month_impacts = analyze_cross_month_impacts(matched_pairs)
+    # Cross-month impact analysis (combine both types)
+    all_pairs = matched_pairs + [(s, r, d) for s, r, d in credit_card_pairs]
+    cross_month_impacts = analyze_cross_month_impacts(all_pairs)
     
     if cross_month_impacts:
         print(f"📅 CROSS-MONTH TRANSFER IMPACTS")
@@ -248,7 +388,7 @@ def print_timing_analysis(transactions: list):
         print(f"❓ UNMATCHED TRANSFERS")
         print("-" * 40)
         print(f"Found {len(unmatched_transfers)} unmatched transfer transactions:")
-        print("(These might be transfers with >3 day lag, external transfers, or data issues)")
+        print("(These might be transfers with >7 day lag, external transfers, or data issues)")
         print()
         
         # Group by month for better analysis
@@ -279,14 +419,18 @@ def print_timing_analysis(transactions: list):
     print("=" * 80)
     
     if cross_month_impacts:
-        print("• Monthly reports may show imbalanced internal transfers due to 3-day processing lag")
+        print("• Monthly reports may show imbalanced internal transfers due to processing lag")
         print("• Consider using quarterly or annual summaries for more accurate transfer analysis")
     
-    if unmatched_count > matched_count * 0.2:  # More than 20% unmatched
+    if unmatched_count > total_matched_count * 0.2:  # More than 20% unmatched
         print("• High number of unmatched transfers detected - review for:")
-        print("  - Transfers with >3 business day lag")
+        print("  - Transfers with >7 day lag")
         print("  - External transfers misclassified as internal")
         print("  - Missing transaction data")
+    
+    if len(credit_card_pairs) > 0:
+        print("• Credit card payment pairs detected - these represent the same money flow")
+        print("• Consider consolidating these in monthly summaries to avoid double-counting")
     
     if timing_stats.get(0, 0) < sum(timing_stats.values()) * 0.5:  # Less than 50% same-day
         print("• Most transfers have processing lag - account for this in cash flow planning")

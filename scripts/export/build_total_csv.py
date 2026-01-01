@@ -12,6 +12,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 import logging
+from collections import defaultdict
 
 # Add the src directory to the path so we can import our modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
@@ -75,7 +76,7 @@ def load_and_combine_csv_files(csv_files: list, logger) -> pd.DataFrame:
 
 
 def clean_and_deduplicate(df: pd.DataFrame, logger) -> pd.DataFrame:
-    """Clean the data and remove duplicates."""
+    """Clean the data and remove duplicates using advanced fuzzy matching."""
     logger.info("Cleaning and deduplicating data...")
     
     # Convert date column to datetime
@@ -93,18 +94,105 @@ def clean_and_deduplicate(df: pd.DataFrame, logger) -> pd.DataFrame:
     # Sort by date, then by amount, then by description for consistent ordering
     df = df.sort_values(['date', 'amount', 'description'], ascending=[True, True, True])
     
-    # Remove duplicates based on key fields
-    # We consider transactions duplicates if they have the same date, amount, description, and account
+    # First pass: Remove exact duplicates
     duplicate_cols = ['date', 'amount', 'description', 'account', 'institution']
     initial_count = len(df)
     df = df.drop_duplicates(subset=duplicate_cols, keep='first')
     
-    duplicates_removed = initial_count - len(df)
-    if duplicates_removed > 0:
-        logger.info(f"  Removed {duplicates_removed} duplicate transactions")
+    exact_duplicates_removed = initial_count - len(df)
+    if exact_duplicates_removed > 0:
+        logger.info(f"  Removed {exact_duplicates_removed} exact duplicate transactions")
     
+    # Second pass: Advanced fuzzy duplicate detection for cross-source duplicates
+    logger.info("  Running advanced duplicate detection for cross-source duplicates...")
+    
+    # Simple approach: Find PDF vs QFX duplicates from same institution
+    pdf_qfx_duplicates = []
+    
+    # Group by institution, amount, and date range for efficiency
+    by_key = defaultdict(list)
+    for idx, row in df.iterrows():
+        if row['amount'] >= 0:  # Only check spending transactions
+            continue
+        
+        # Create grouping key
+        key = (
+            row['institution'].lower(),
+            round(abs(row['amount']), 2),
+            row['date'].strftime('%Y-%m')  # Group by month
+        )
+        by_key[key].append((idx, row))
+    
+    # Find PDF vs QFX pairs within each group
+    indices_to_remove = set()
+    
+    for key, transactions in by_key.items():
+        if len(transactions) < 2:
+            continue
+            
+        for i, (idx1, row1) in enumerate(transactions):
+            if idx1 in indices_to_remove:
+                continue
+                
+            for idx2, row2 in transactions[i+1:]:
+                if idx2 in indices_to_remove:
+                    continue
+                
+                # Check if one is PDF and other is QFX
+                source1 = row1.get('source_file', '').lower()
+                source2 = row2.get('source_file', '').lower()
+                
+                is_pdf_qfx_pair = (
+                    ('.pdf.' in source1 and '.qfx.' in source2) or
+                    ('.qfx.' in source1 and '.pdf.' in source2)
+                )
+                
+                if not is_pdf_qfx_pair:
+                    continue
+                
+                # Check date proximity (within 3 days)
+                days_diff = abs((row1['date'] - row2['date']).days)
+                if days_diff > 3:
+                    continue
+                
+                # Check exact amount match
+                if abs(row1['amount'] - row2['amount']) > 0.01:
+                    continue
+                
+                # Simple merchant name similarity check
+                desc1 = row1['description'].lower().strip()
+                desc2 = row2['description'].lower().strip()
+                
+                # Remove store numbers and locations for comparison
+                import re
+                desc1_clean = re.sub(r'#\d+|\s+\w+\s+wa\s*$', '', desc1).strip()
+                desc2_clean = re.sub(r'#\d+|\s+\w+\s+wa\s*$', '', desc2).strip()
+                
+                # Check if core merchant names match
+                words1 = set(desc1_clean.split())
+                words2 = set(desc2_clean.split())
+                
+                if words1 and words2:
+                    similarity = len(words1.intersection(words2)) / len(words1.union(words2))
+                    
+                    if similarity >= 0.7:  # 70% similarity threshold
+                        # Prefer QFX over PDF (more detailed data)
+                        if '.qfx.' in source1:
+                            indices_to_remove.add(idx2)  # Remove PDF
+                        else:
+                            indices_to_remove.add(idx1)  # Remove PDF
+    
+    # Remove the identified duplicates
+    if indices_to_remove:
+        df = df.drop(index=list(indices_to_remove))
+        logger.info(f"  Removed {len(indices_to_remove)} PDF vs QFX duplicate transactions")
+    else:
+        logger.info("  No PDF vs QFX duplicates found")
     # Reset index
     df = df.reset_index(drop=True)
+    
+    total_duplicates_removed = exact_duplicates_removed + len(indices_to_remove)
+    logger.info(f"  Total duplicates removed: {total_duplicates_removed} ({exact_duplicates_removed} exact + {len(indices_to_remove)} fuzzy)")
     
     return df
 

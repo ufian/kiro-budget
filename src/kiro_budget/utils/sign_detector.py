@@ -136,7 +136,17 @@ class TransactionSignDetector:
             if keyword in desc_lower:
                 return 'transfer_in'
         
-        # Check for income keywords first (they tend to be more specific)
+        # Check for credit card payments (these should always be transfer_out from bank accounts)
+        credit_card_payment_patterns = [
+            'credit crd epay', 'credit card epay', 'cardpymt', 'card payment',
+            'gsbank payment', 'applecard gsbank', 'chase credit', 'discover payment'
+        ]
+        
+        for pattern in credit_card_payment_patterns:
+            if pattern in desc_lower:
+                return 'transfer_out'
+        
+        # Check for income keywords
         for keyword in self.INCOME_KEYWORDS:
             if keyword in desc_lower:
                 return 'income'
@@ -206,129 +216,80 @@ class TransactionSignDetector:
         
         return 'unknown', 0.1
     
+    def _should_flip_file_signs(self, analysis: Dict[str, any]) -> bool:
+        """Determine if all transaction signs in the file should be flipped.
+        
+        Args:
+            analysis: File sign convention analysis results
+            
+        Returns:
+            True if all signs should be flipped, False if they should remain unchanged
+        """
+        # Only flip if we detect credit card convention with sufficient confidence
+        return (
+            analysis['convention'] == 'credit_card' and 
+            analysis['confidence'] >= 0.5
+        )
+    
+    def _flip_all_transaction_signs(self, transactions: List[Transaction]) -> List[Transaction]:
+        """Flip the sign of all transactions in the list.
+        
+        Args:
+            transactions: List of transactions to flip
+            
+        Returns:
+            List of transactions with all signs flipped
+        """
+        flipped_transactions = []
+        
+        for transaction in transactions:
+            # Create a copy with flipped sign
+            flipped = Transaction(
+                date=transaction.date,
+                amount=-transaction.amount,  # Flip the sign
+                description=transaction.description,
+                account=transaction.account,
+                institution=transaction.institution,
+                transaction_id=transaction.transaction_id,
+                category=transaction.category,
+                balance=transaction.balance
+            )
+            flipped_transactions.append(flipped)
+        
+        return flipped_transactions
+    
     def correct_transaction_signs(self, transactions: List[Transaction], 
                                 account_config: Optional[AccountConfig] = None) -> List[Transaction]:
         """Correct transaction signs to follow banking convention.
+        
+        This method makes a single decision for the entire file:
+        1. Analyze if the file needs sign correction
+        2. If yes: flip ALL transaction signs
+        3. If no: keep ALL transactions unchanged
         
         Args:
             transactions: List of transactions to correct
             account_config: Optional account configuration for additional context
             
         Returns:
-            List of transactions with corrected signs
+            List of transactions with corrected signs (all changed or all unchanged)
         """
         if not transactions:
             return transactions
         
-        # Analyze the file's sign convention
+        # Step 1: Analyze the file's sign convention
         analysis = self.analyze_file_sign_convention(transactions)
-        
         self.logger.info(f"Sign analysis: {analysis}")
         
-        # If confidence is too low, don't make changes
-        if analysis['confidence'] < 0.2:
-            self.logger.warning(f"Low confidence ({analysis['confidence']:.2f}) in sign detection, "
-                              f"keeping original signs")
-            return transactions
+        # Step 2: Make a single decision for the entire file
+        should_flip_all_signs = self._should_flip_file_signs(analysis)
         
-        corrected_transactions = []
-        
-        for transaction in transactions:
-            corrected_transaction = self._correct_single_transaction_sign(
-                transaction, analysis, account_config
-            )
-            corrected_transactions.append(corrected_transaction)
-        
-        return corrected_transactions
-    
-    def _correct_single_transaction_sign(self, transaction: Transaction, 
-                                       analysis: Dict[str, any],
-                                       account_config: Optional[AccountConfig] = None) -> Transaction:
-        """Correct the sign of a single transaction.
-        
-        Args:
-            transaction: Transaction to correct
-            analysis: File sign convention analysis
-            account_config: Optional account configuration
-            
-        Returns:
-            Transaction with corrected sign
-        """
-        # Create a copy to avoid modifying the original
-        corrected = Transaction(
-            date=transaction.date,
-            amount=transaction.amount,
-            description=transaction.description,
-            account=transaction.account,
-            institution=transaction.institution,
-            transaction_id=transaction.transaction_id,
-            category=transaction.category,
-            balance=transaction.balance
-        )
-        
-        # Classify the transaction type
-        transaction_type = self._classify_transaction_type(transaction.description)
-        
-        # Apply sign correction based on detected convention
-        if analysis['convention'] == 'credit_card' and analysis['confidence'] >= 0.5:
-            corrected.amount = self._apply_credit_card_sign_correction(
-                transaction.amount, transaction_type
-            )
-        elif analysis['convention'] == 'banking':
-            # Already in banking convention, but validate
-            corrected.amount = self._validate_banking_convention_sign(
-                transaction.amount, transaction_type
-            )
-        
-        # Log significant sign changes
-        if corrected.amount != transaction.amount:
-            self.logger.debug(f"Corrected sign for transaction: {transaction.description[:50]} "
-                            f"from {transaction.amount} to {corrected.amount}")
-        
-        return corrected
-    
-    def _apply_credit_card_sign_correction(self, amount: Decimal, transaction_type: str) -> Decimal:
-        """Apply credit card to banking convention sign correction.
-        
-        Credit card convention: spending positive, income negative
-        Banking convention: spending negative, income positive
-        """
-        if transaction_type == 'spending':
-            # Spending should be negative in banking convention
-            return -abs(amount)
-        elif transaction_type == 'income':
-            # Income should be positive in banking convention
-            return abs(amount)
-        elif transaction_type == 'transfer_out':
-            # Transfer out should be negative
-            return -abs(amount)
-        elif transaction_type == 'transfer_in':
-            # Transfer in should be positive
-            return abs(amount)
+        # Step 3: Apply the decision consistently to all transactions
+        if should_flip_all_signs:
+            self.logger.info(f"Flipping signs for all {len(transactions)} transactions "
+                           f"(detected {analysis['convention']} convention with {analysis['confidence']:.2f} confidence)")
+            return self._flip_all_transaction_signs(transactions)
         else:
-            # For unknown types, invert the sign (credit card to banking conversion)
-            return -amount
-    
-    def _validate_banking_convention_sign(self, amount: Decimal, transaction_type: str) -> Decimal:
-        """Validate that a transaction follows banking convention.
-        
-        Only makes corrections if there's a clear mismatch.
-        """
-        if transaction_type == 'spending' and amount > 0:
-            # Spending should be negative
-            self.logger.debug(f"Correcting positive spending amount: {amount}")
-            return -amount
-        elif transaction_type == 'income' and amount < 0:
-            # Income should be positive
-            self.logger.debug(f"Correcting negative income amount: {amount}")
-            return -amount
-        elif transaction_type == 'transfer_out' and amount > 0:
-            # Transfer out should be negative
-            self.logger.debug(f"Correcting positive transfer out amount: {amount}")
-            return -amount
-        elif transaction_type == 'transfer_in' and amount < 0:
-            # Transfer in should be positive
-            self.logger.debug(f"Correcting negative transfer in amount: {amount}")
-            return -amount
-        
-        return amount
+            self.logger.info(f"Keeping original signs for all {len(transactions)} transactions "
+                           f"(detected {analysis['convention']} convention with {analysis['confidence']:.2f} confidence)")
+            return transactions

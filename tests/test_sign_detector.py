@@ -133,25 +133,28 @@ class TestTransactionSignDetector:
             self.create_transaction("25.00", "RESTAURANT BILL"),         # Should become -25.00
             self.create_transaction("-1000.00", "PAYMENT THANK YOU"),    # Should become +1000.00
             self.create_transaction("-10.00", "CASHBACK REWARD"),        # Should become +10.00
-            self.create_transaction("15.00", "MONTHLY FEE")              # Should become -15.00
+            self.create_transaction("15.00", "MONTHLY FEE"),             # Should become -15.00
+            self.create_transaction("100.00", "UNKNOWN TRANSACTION")     # Should become -100.00 (all signs flipped)
         ]
         
         corrected = self.detector.correct_transaction_signs(transactions)
         
-        # Verify spending transactions are now negative
-        spending_transactions = [t for t in corrected if 'purchase' in t.description.lower() or 
-                               'restaurant' in t.description.lower() or 'fee' in t.description.lower()]
-        for transaction in spending_transactions:
-            assert transaction.amount < 0, f"Spending transaction should be negative: {transaction.description}"
+        # ALL transactions should have their signs flipped (credit card to banking conversion)
+        expected_amounts = [
+            Decimal('-50.00'),   # Was +50.00
+            Decimal('-25.00'),   # Was +25.00
+            Decimal('1000.00'),  # Was -1000.00
+            Decimal('10.00'),    # Was -10.00
+            Decimal('-15.00'),   # Was +15.00
+            Decimal('-100.00')   # Was +100.00
+        ]
         
-        # Verify income transactions are now positive
-        income_transactions = [t for t in corrected if 'payment' in t.description.lower() or 
-                             'cashback' in t.description.lower()]
-        for transaction in income_transactions:
-            assert transaction.amount > 0, f"Income transaction should be positive: {transaction.description}"
+        for i, (transaction, expected) in enumerate(zip(corrected, expected_amounts)):
+            assert transaction.amount == expected, \
+                f"Transaction {i} should be {expected}, got {transaction.amount}: {transaction.description}"
     
     def test_correct_banking_convention_validation(self):
-        """Test validation of already correct banking convention"""
+        """Test that banking convention files are left unchanged"""
         transactions = [
             self.create_transaction("-50.00", "GROCERY STORE PURCHASE"),
             self.create_transaction("-25.00", "ATM WITHDRAWAL"),
@@ -180,32 +183,6 @@ class TestTransactionSignDetector:
         for original, corrected_tx in zip(transactions, corrected):
             assert original.amount == corrected_tx.amount, \
                 "Low confidence should not change transaction signs"
-    
-    def test_transfer_sign_correction(self):
-        """Test correction of transfer transaction signs"""
-        transactions = [
-            self.create_transaction("100.00", "TRANSFER TO SAVINGS"),     # Should become -100.00
-            self.create_transaction("-200.00", "TRANSFER FROM CHECKING"), # Should become +200.00
-            self.create_transaction("50.00", "OUTGOING TRANSFER"),        # Should become -50.00
-            self.create_transaction("-75.00", "INCOMING TRANSFER"),       # Should become +75.00
-            # Add more transactions to increase confidence
-            self.create_transaction("25.00", "GROCERY STORE PURCHASE"),   # Should become -25.00
-            self.create_transaction("30.00", "RESTAURANT BILL"),          # Should become -30.00
-            self.create_transaction("-500.00", "SALARY DEPOSIT"),         # Should become +500.00
-            self.create_transaction("-10.00", "CASHBACK REWARD")          # Should become +10.00
-        ]
-        
-        corrected = self.detector.correct_transaction_signs(transactions)
-        
-        # Check transfer out transactions are negative
-        transfer_out = [t for t in corrected if 'to' in t.description.lower() or 'outgoing' in t.description.lower()]
-        for transaction in transfer_out:
-            assert transaction.amount < 0, f"Transfer out should be negative: {transaction.description}"
-        
-        # Check transfer in transactions are positive
-        transfer_in = [t for t in corrected if 'from' in t.description.lower() or 'incoming' in t.description.lower()]
-        for transaction in transfer_in:
-            assert transaction.amount > 0, f"Transfer in should be positive: {transaction.description}"
     
     def test_empty_transactions_list(self):
         """Test handling of empty transactions list"""
@@ -243,3 +220,33 @@ class TestTransactionSignDetector:
         
         assert convention == 'unknown'
         assert confidence == 0.0
+    
+    def test_flip_all_signs_for_credit_card_file(self):
+        """Test that ALL signs are flipped when credit card convention is detected with high confidence."""
+        # Create a clear credit card file pattern
+        transactions = [
+            self.create_transaction("50.00", "GROCERY STORE PURCHASE"),    # Spending positive
+            self.create_transaction("25.00", "RESTAURANT BILL"),           # Spending positive  
+            self.create_transaction("15.00", "MONTHLY FEE"),               # Spending positive
+            self.create_transaction("-1000.00", "PAYMENT THANK YOU"),      # Payment negative
+            self.create_transaction("-10.00", "CASHBACK REWARD"),          # Cashback negative
+            self.create_transaction("200.00", "SOME UNKNOWN TRANSACTION"), # Unknown transaction
+            self.create_transaction("-5.00", "ANOTHER UNKNOWN TRANSACTION") # Unknown transaction
+        ]
+        
+        corrected = self.detector.correct_transaction_signs(transactions)
+        
+        # ALL transactions should have flipped signs
+        expected_amounts = [
+            Decimal('-50.00'),   # Was +50.00
+            Decimal('-25.00'),   # Was +25.00  
+            Decimal('-15.00'),   # Was +15.00
+            Decimal('1000.00'),  # Was -1000.00
+            Decimal('10.00'),    # Was -10.00
+            Decimal('-200.00'),  # Was +200.00 (unknown but flipped)
+            Decimal('5.00')      # Was -5.00 (unknown but flipped)
+        ]
+        
+        for i, (transaction, expected) in enumerate(zip(corrected, expected_amounts)):
+            assert transaction.amount == expected, \
+                f"Transaction {i} should be {expected}, got {transaction.amount}: {transaction.description}"

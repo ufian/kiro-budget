@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Generate monthly transaction summary HTML report.
+"""Generate monthly transaction summary HTML report with transfer pair detection.
 
 This script reads the consolidated transactions file and produces an HTML
 report with monthly summaries showing:
 - Total income (external deposits/transfers in)
-- Internal transfers (between own accounts)
+- Internal transfers (between own accounts) - NET amounts after pairing
 - External transfers (transfers out to external accounts)
 - Total spending (purchases, bills, etc.)
 
-IMPORTANT: Internal transfers may have up to 3 business days of processing lag,
-which means transfer pairs might appear in different months. Monthly totals
-for internal transfers may not balance perfectly within a single month.
+ENHANCED: Now detects and consolidates transfer pairs to avoid double-counting
+the same money flow (e.g., credit card payments that appear as both a payment
+received and a bank account debit).
 
 Sign convention:
 - Negative numbers = spending (money going out)
@@ -31,7 +31,7 @@ import html
 import json
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -85,6 +85,251 @@ REFUND_PATTERNS = [
 ]
 
 
+def find_internal_transfer_pairs(transactions: list, max_days: int = 3) -> list:
+    """Find internal transfer pairs between own accounts.
+    
+    Looks for patterns like:
+    - "Withdrawal Transfer To 0547" → "Deposit Transfer From 0596"
+    - "Transfer To Savings" → "Transfer From Checking"
+    - "Descriptive Withdrawal P2P Transfer" → "Zelle Payment From MIKHAIL OLENIN"
+    """
+    internal_pairs = []
+    
+    # Find withdrawal/outgoing transfers
+    withdrawals = []
+    for txn in transactions:
+        if txn['amount'] < 0:  # Negative amount (money sent)
+            desc_lower = txn['description'].lower()
+            
+            # Look for withdrawal/outgoing transfer patterns
+            if any(pattern in desc_lower for pattern in [
+                'withdrawal transfer to',
+                'transfer to',
+                'outgoing transfer',
+                'wire out',
+                'descriptive withdrawal p2p transfer',  # P2P transfers
+                'p2p transfer',
+                'zelle sent',
+                'zelle payment to',
+            ]):
+                withdrawals.append(txn)
+    
+    # Find deposit/incoming transfers
+    deposits = []
+    for txn in transactions:
+        if txn['amount'] > 0:  # Positive amount (money received)
+            desc_lower = txn['description'].lower()
+            
+            # Look for deposit/incoming transfer patterns
+            if any(pattern in desc_lower for pattern in [
+                'deposit transfer from',
+                'transfer from',
+                'incoming transfer',
+                'wire in',
+                'zelle payment from',  # P2P transfers
+                'zelle received',
+                'zelle deposit',
+            ]):
+                deposits.append(txn)
+    
+    # Match transfers with exact amount and close timing
+    matched_ids = set()
+    
+    for withdrawal_txn in withdrawals:
+        if id(withdrawal_txn) in matched_ids:
+            continue
+            
+        best_match = None
+        best_score = float('inf')
+        
+        for deposit_txn in deposits:
+            if id(deposit_txn) in matched_ids:
+                continue
+            
+            # Skip if same account (shouldn't happen for transfers)
+            if withdrawal_txn['account'] == deposit_txn['account']:
+                continue
+            
+            # Calculate days difference
+            days_diff = abs((withdrawal_txn['date'] - deposit_txn['date']).days)
+            if days_diff > max_days:
+                continue
+            
+            # Check if amounts match (withdrawal negative, deposit positive)
+            if abs(withdrawal_txn['amount']) == abs(deposit_txn['amount']):
+                # Perfect amount match - score by timing
+                score = days_diff
+                
+                if score < best_score:
+                    best_match = deposit_txn
+                    best_score = score
+        
+        if best_match:
+            internal_pairs.append((withdrawal_txn, best_match, int(best_score)))
+            matched_ids.add(id(withdrawal_txn))
+            matched_ids.add(id(best_match))
+    
+    return internal_pairs
+
+
+def find_credit_card_payment_pairs(transactions: list, max_days: int = 7) -> list:
+    """Find credit card payment pairs with flexible matching.
+    
+    Looks for patterns like:
+    - Chase "Payment Thank You" → FirstTech "APPLECARD GSBANK PAYMENT"
+    - Gemini "Payment Transaction" → Discover "Gemini CardPymt"
+    
+    Returns list of (sent_txn, received_txn, days_diff) tuples.
+    """
+    credit_card_pairs = []
+    
+    # Define credit card payment patterns
+    payment_received_patterns = [
+        ('chase', 'payment thank you'),
+        ('gemini', 'payment transaction'),
+        ('apple', 'deposit internet transfer fr'),  # Apple Card payments
+    ]
+    
+    payment_sent_patterns = [
+        ('firsttech', 'applecard gsbank payment'),
+        ('firsttech', 'chase credit crd epay'),
+        ('discover', 'gemini cardpymt'),
+    ]
+    
+    # Find payment received transactions
+    payment_received = []
+    for txn in transactions:
+        if txn['amount'] > 0:  # Positive amount (money received)
+            desc_lower = txn['description'].lower()
+            inst_lower = txn['institution'].lower()
+            
+            for inst_pattern, desc_pattern in payment_received_patterns:
+                if inst_pattern in inst_lower and desc_pattern in desc_lower:
+                    payment_received.append(txn)
+                    break
+    
+    # Find payment sent transactions
+    payment_sent = []
+    for txn in transactions:
+        if txn['amount'] < 0:  # Negative amount (money sent)
+            desc_lower = txn['description'].lower()
+            inst_lower = txn['institution'].lower()
+            
+            for inst_pattern, desc_pattern in payment_sent_patterns:
+                if inst_pattern in inst_lower and desc_pattern in desc_lower:
+                    payment_sent.append(txn)
+                    break
+    
+    # Match payments with flexible amount and timing
+    matched_ids = set()
+    
+    for received_txn in payment_received:
+        if id(received_txn) in matched_ids:
+            continue
+            
+        best_match = None
+        best_score = 0
+        
+        for sent_txn in payment_sent:
+            if id(sent_txn) in matched_ids:
+                continue
+            
+            # Calculate days difference
+            days_diff = abs((received_txn['date'] - sent_txn['date']).days)
+            if days_diff > max_days:
+                continue
+            
+            # Calculate amount similarity (allow for small differences due to fees, etc.)
+            amount_diff = abs(abs(received_txn['amount']) - abs(sent_txn['amount']))
+            amount_ratio = amount_diff / max(abs(received_txn['amount']), abs(sent_txn['amount']))
+            
+            # Score the match (lower is better)
+            # Prioritize: exact amount match > close amount > timing
+            if amount_diff == 0:
+                score = days_diff  # Perfect amount match
+            elif amount_ratio < 0.05:  # Within 5%
+                score = days_diff + 10
+            elif amount_ratio < 0.10:  # Within 10%
+                score = days_diff + 20
+            else:
+                continue  # Too different
+            
+            if best_match is None or score < best_score:
+                best_match = sent_txn
+                best_score = score
+        
+        if best_match:
+            days_diff = abs((received_txn['date'] - best_match['date']).days)
+            credit_card_pairs.append((best_match, received_txn, days_diff))
+            matched_ids.add(id(received_txn))
+            matched_ids.add(id(best_match))
+    
+    return credit_card_pairs
+
+
+def identify_transfer_pairs(transactions: list) -> tuple:
+    """Identify transfer pairs and return consolidated view.
+    
+    Returns:
+        (all_transfer_pairs, excluded_transaction_ids, pair_summaries)
+    """
+    # Find credit card payment pairs
+    credit_card_pairs = find_credit_card_payment_pairs(transactions, max_days=7)
+    
+    # Find internal transfer pairs (between own accounts)
+    internal_transfer_pairs = find_internal_transfer_pairs(transactions, max_days=3)
+    
+    # Combine all pairs
+    all_transfer_pairs = credit_card_pairs + internal_transfer_pairs
+    
+    # Track which transactions are part of pairs
+    excluded_ids = set()
+    pair_summaries = []
+    
+    # Process credit card payment pairs
+    for sent_txn, received_txn, days_diff in credit_card_pairs:
+        excluded_ids.add(id(sent_txn))
+        excluded_ids.add(id(received_txn))
+        
+        # Create a summary for the pair (net effect is the sent transaction)
+        pair_summaries.append({
+            'date': sent_txn['date'],  # Use the sent transaction date
+            'amount': sent_txn['amount'],  # Net effect (negative = money out)
+            'description': f"Credit Card Payment: {sent_txn['description']} ↔ {received_txn['description']}",
+            'account': sent_txn['account'],
+            'account_name': sent_txn['account_name'],
+            'account_type': sent_txn.get('account_type', 'debit'),
+            'institution': f"{sent_txn['institution']} → {received_txn['institution']}",
+            'pair_type': 'credit_card_payment',
+            'sent_txn': sent_txn,
+            'received_txn': received_txn,
+            'days_diff': days_diff,
+        })
+    
+    # Process internal transfer pairs
+    for sent_txn, received_txn, days_diff in internal_transfer_pairs:
+        excluded_ids.add(id(sent_txn))
+        excluded_ids.add(id(received_txn))
+        
+        # For internal transfers, net effect is zero (money just moved between accounts)
+        # But we'll show it as the withdrawal transaction for tracking
+        pair_summaries.append({
+            'date': sent_txn['date'],  # Use the withdrawal transaction date
+            'amount': Decimal('0'),  # Net effect is zero (internal move)
+            'description': f"Internal Transfer: {sent_txn['description']} ↔ {received_txn['description']}",
+            'account': sent_txn['account'],
+            'account_name': sent_txn['account_name'],
+            'account_type': sent_txn.get('account_type', 'debit'),
+            'institution': sent_txn['institution'],
+            'pair_type': 'internal_transfer',
+            'sent_txn': sent_txn,
+            'received_txn': received_txn,
+            'days_diff': days_diff,
+        })
+    
+    return all_transfer_pairs, excluded_ids, pair_summaries
+
+
 def classify_transaction(description: str, amount: Decimal, account_type: str = 'debit', institution: str = '') -> str:
     """Classify a transaction into a category.
     
@@ -93,6 +338,9 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
     Note: All transactions now follow banking convention after automatic sign detection:
     - Negative amounts = spending (money going out)
     - Positive amounts = income, refunds, payments (money coming in)
+    
+    IMPORTANT: Amount sign takes precedence over description keywords to avoid misclassification
+    of transactions like "PAYSEND Credit" which are spending despite containing "credit".
     """
     desc_lower = description.lower()
     
@@ -111,26 +359,27 @@ def classify_transaction(description: str, amount: Decimal, account_type: str = 
         if pattern in desc_lower:
             return 'external_transfer'
     
-    # Check for salary/income patterns (specific employers)
-    for pattern in INCOME_PATTERNS:
-        if pattern in desc_lower:
-            return 'income'
-    
-    # Check for refunds - these are spending adjustments, not income
-    for pattern in REFUND_PATTERNS:
-        if pattern in desc_lower:
-            return 'refund'
-    
-    # For credit card accounts, handle different sign conventions by institution
+    # For credit card accounts, use specialized logic
     if account_type == 'credit':
         return _classify_credit_card_transaction(description, amount, institution)
     
-    # For debit/checking accounts:
-    # - Negative amounts are spending
-    # - Positive amounts are treated as refunds/misc (not income)
+    # For debit/checking accounts, prioritize amount sign over description keywords
     if amount < 0:
+        # Negative amounts are ALWAYS spending, regardless of description
+        # This handles cases like "PAYSEND Credit" which is spending despite "credit" keyword
         return 'spending'
     else:
+        # Positive amounts - check for specific income patterns first
+        for pattern in INCOME_PATTERNS:
+            if pattern in desc_lower:
+                return 'income'
+        
+        # Check for refund patterns only for positive amounts
+        for pattern in REFUND_PATTERNS:
+            if pattern in desc_lower:
+                return 'refund'
+        
+        # Default positive amounts to refunds/misc (not income)
         return 'refund'
 
 
@@ -161,8 +410,12 @@ def _classify_credit_card_transaction(description: str, amount: Decimal, institu
             return 'refund'
 
 
-def load_transactions(csv_path: str) -> list:
-    """Load transactions from CSV file."""
+def load_transactions(csv_path: str) -> tuple:
+    """Load transactions from CSV file and identify transfer pairs.
+    
+    Returns:
+        (transactions, transfer_pairs, excluded_ids, pair_summaries)
+    """
     transactions = []
     
     with open(csv_path, 'r', encoding='utf-8') as f:
@@ -183,18 +436,29 @@ def load_transactions(csv_path: str) -> list:
             except (ValueError, KeyError) as e:
                 print(f"Warning: Skipping invalid row: {e}", file=sys.stderr)
     
-    return transactions
+    # Identify transfer pairs
+    transfer_pairs, excluded_ids, pair_summaries = identify_transfer_pairs(transactions)
+    
+    # Count different types of pairs
+    credit_card_pairs = [p for p in pair_summaries if p['pair_type'] == 'credit_card_payment']
+    internal_pairs = [p for p in pair_summaries if p['pair_type'] == 'internal_transfer']
+    
+    print(f"Found {len(credit_card_pairs)} credit card payment pairs")
+    print(f"Found {len(internal_pairs)} internal transfer pairs")
+    print(f"Total: {len(transfer_pairs)} transfer pairs ({len(excluded_ids)} transactions)")
+    
+    return transactions, transfer_pairs, excluded_ids, pair_summaries
 
 
-def aggregate_by_month(transactions: list) -> tuple:
-    """Aggregate transactions by month and category.
+def aggregate_by_month(transactions: list, excluded_ids: set, pair_summaries: list) -> tuple:
+    """Aggregate transactions by month and category, excluding transfer pair duplicates.
     
     Sign convention:
     - Negative = money going out (spending)
     - Positive = money coming in (income, refunds, credit card payments)
     
     Returns:
-        (monthly_totals, monthly_transactions) where monthly_transactions
+        (monthly_totals, monthly_transactions, transfer_pair_info) where monthly_transactions
         contains the actual transaction lists for each cell.
     """
     monthly = defaultdict(lambda: {
@@ -214,15 +478,17 @@ def aggregate_by_month(transactions: list) -> tuple:
         'spending': [],
     })
     
+    # Store transfer pair info by month
+    monthly_pairs = defaultdict(list)
+    
+    # Process regular transactions (excluding those in transfer pairs)
     for txn in transactions:
+        if id(txn) in excluded_ids:
+            continue  # Skip transactions that are part of transfer pairs
+            
         month_key = txn['date'].strftime('%Y-%m')
         account_type = txn.get('account_type', 'debit')
         category = classify_transaction(txn['description'], txn['amount'], account_type, txn.get('institution', ''))
-        amount = txn['amount']
-        
-        # Credit card amounts already follow standard sign convention:
-        # - Negative = spending, Positive = credits/payments
-        # No normalization needed for credit cards
         amount = txn['amount']
         
         # Store transaction for drill-down
@@ -252,10 +518,43 @@ def aggregate_by_month(transactions: list) -> tuple:
             monthly[month_key]['spending'] += amount  # Negative
             monthly_txns[month_key]['spending'].append(txn_data)
     
-    return monthly, monthly_txns
+    # Process transfer pair summaries (net effect only)
+    for pair_summary in pair_summaries:
+        month_key = pair_summary['date'].strftime('%Y-%m')
+        amount = pair_summary['amount']  # Net effect (negative for money out)
+        
+        # Store pair info for display
+        monthly_pairs[month_key].append({
+            'sent_date': pair_summary['sent_txn']['date'].strftime('%Y-%m-%d'),
+            'received_date': pair_summary['received_txn']['date'].strftime('%Y-%m-%d'),
+            'amount': float(amount),
+            'sent_desc': pair_summary['sent_txn']['description'],
+            'received_desc': pair_summary['received_txn']['description'],
+            'sent_institution': pair_summary['sent_txn']['institution'],
+            'received_institution': pair_summary['received_txn']['institution'],
+            'days_diff': pair_summary['days_diff'],
+            'pair_type': pair_summary['pair_type'],
+        })
+        
+        # Add net effect to internal transfers
+        monthly[month_key]['internal_transfer'] += amount
+        
+        # Add consolidated transaction for drill-down
+        pair_txn_data = {
+            'date': pair_summary['date'].strftime('%Y-%m-%d'),
+            'amount': float(amount),
+            'description': pair_summary['description'],
+            'account_name': pair_summary['account_name'],
+            'institution': pair_summary['institution'],
+            'is_pair': True,
+            'pair_info': monthly_pairs[month_key][-1],  # Reference to the pair info
+        }
+        monthly_txns[month_key]['internal_transfer'].append(pair_txn_data)
+    
+    return monthly, monthly_txns, monthly_pairs
 
 
-def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
+def generate_html(monthly_data: dict, monthly_txns: dict, monthly_pairs: dict, transfer_pairs: list, pair_summaries: list, output_path: str):
     """Generate HTML report with clickable cells.
     
     Sign convention displayed:
@@ -273,11 +572,15 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
         'external_transfer': Decimal('0'),
         'credits': Decimal('0'),
         'spending': Decimal('0'),
+        'net': Decimal('0'),
     }
     
     for month_data in monthly_data.values():
         for key in totals:
-            totals[key] += month_data[key]
+            if key != 'net':  # Calculate net separately
+                totals[key] += month_data[key]
+        # Calculate net: Income + External Transfers + Credits/Refunds + Spending (exclude Internal Transfers)
+        totals['net'] += month_data['income'] + month_data['external_transfer'] + month_data['credits'] + month_data['spending']
     
     # Convert transactions to JSON for JavaScript
     txns_json = json.dumps({
@@ -463,10 +766,18 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
         <span class="legend-item legend-negative">Negative (-) = Spending (money out)</span>
         <span class="legend-item legend-positive">Positive (+) = Income, Refunds, Credits (money in)</span>
     </div>
+    <div class="legend" style="background: #e8f5e9; border-left: 4px solid #4caf50;">
+        <div class="legend-title" style="color: #2e7d32;">✅ Transfer Pair Detection:</div>
+        <p style="margin: 5px 0; color: #1b5e20; font-size: 0.9em;">
+            Found <strong>{len([p for p in pair_summaries if p['pair_type'] == 'credit_card_payment'])} credit card payment pairs</strong> and 
+            <strong>{len([p for p in pair_summaries if p['pair_type'] == 'internal_transfer'])} internal transfer pairs</strong>.
+            These are consolidated to show NET transfer amounts and avoid double-counting.
+        </p>
+    </div>
     <div class="legend" style="background: #fff3e0; border-left: 4px solid #ff9800;">
         <div class="legend-title" style="color: #e65100;">⚠️ Internal Transfer Timing:</div>
         <p style="margin: 5px 0; color: #bf360c; font-size: 0.9em;">
-            Internal transfers may have up to 3 business days of processing lag. 
+            Internal transfers may have up to 7 days of processing lag. 
             Transfer pairs might appear in different months, causing monthly internal transfer totals to not balance perfectly.
         </p>
     </div>
@@ -480,6 +791,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
                 <th>External Transfers</th>
                 <th>Credits/Refunds</th>
                 <th>Spending</th>
+                <th>Net</th>
             </tr>
         </thead>
         <tbody>
@@ -504,7 +816,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
     for year in sorted(months_by_year.keys()):
         # Year header row
         html_content += f'''            <tr class="year-header">
-                <td colspan="6">📅 {year}</td>
+                <td colspan="7">📅 {year}</td>
             </tr>
 '''
         
@@ -515,6 +827,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
             'external_transfer': Decimal('0'),
             'credits': Decimal('0'),
             'spending': Decimal('0'),
+            'net': Decimal('0'),
         }
         
         for month in months_by_year[year]:
@@ -522,7 +835,10 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
             
             # Accumulate year totals
             for key in year_totals:
-                year_totals[key] += data[key]
+                if key != 'net':  # Calculate net separately
+                    year_totals[key] += data[key]
+            # Calculate net: Income + External Transfers + Credits/Refunds + Spending (exclude Internal Transfers)
+            year_totals['net'] += data['income'] + data['external_transfer'] + data['credits'] + data['spending']
             
             # Format month for display (just month name, year is in header)
             month_display = datetime.strptime(month, '%Y-%m').strftime('%B')
@@ -534,6 +850,10 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
             credits_fmt, credits_cls = fmt_with_class(data['credits'])
             spending_fmt, spending_cls = fmt_with_class(data['spending'])
             
+            # Calculate net for this month: Income + External Transfers + Credits/Refunds + Spending
+            month_net = data['income'] + data['external_transfer'] + data['credits'] + data['spending']
+            net_fmt, net_cls = fmt_with_class(month_net)
+            
             html_content += f'''            <tr>
                 <td>{month_display}</td>
                 <td class="{income_cls} clickable" onclick="showTransactions('{month}', 'income', '{month_full}')">{income_fmt}</td>
@@ -541,6 +861,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
                 <td class="{external_cls} clickable" onclick="showTransactions('{month}', 'external_transfer', '{month_full}')">{external_fmt}</td>
                 <td class="{credits_cls} clickable" onclick="showTransactions('{month}', 'credits', '{month_full}')">{credits_fmt}</td>
                 <td class="{spending_cls} clickable" onclick="showTransactions('{month}', 'spending', '{month_full}')">{spending_fmt}</td>
+                <td class="{net_cls}" style="font-weight: bold;">{net_fmt}</td>
             </tr>
 '''
         
@@ -550,6 +871,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
         external_fmt, external_cls = fmt_with_class(year_totals['external_transfer'])
         credits_fmt, credits_cls = fmt_with_class(year_totals['credits'])
         spending_fmt, spending_cls = fmt_with_class(year_totals['spending'])
+        net_fmt, net_cls = fmt_with_class(year_totals['net'])
         
         html_content += f'''            <tr class="year-subtotal">
                 <td>{year} Subtotal</td>
@@ -558,6 +880,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
                 <td class="{external_cls}">{external_fmt}</td>
                 <td class="{credits_cls}">{credits_fmt}</td>
                 <td class="{spending_cls}">{spending_fmt}</td>
+                <td class="{net_cls}" style="font-weight: bold;">{net_fmt}</td>
             </tr>
 '''
     
@@ -567,6 +890,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
     external_fmt, external_cls = fmt_with_class(totals['external_transfer'])
     credits_fmt, credits_cls = fmt_with_class(totals['credits'])
     spending_fmt, spending_cls = fmt_with_class(totals['spending'])
+    net_fmt, net_cls = fmt_with_class(totals['net'])
     
     html_content += f'''            <tr class="totals">
                 <td><strong>GRAND TOTAL</strong></td>
@@ -575,6 +899,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
                 <td class="{external_cls}">{external_fmt}</td>
                 <td class="{credits_cls}">{credits_fmt}</td>
                 <td class="{spending_cls}">{spending_fmt}</td>
+                <td class="{net_cls}" style="font-weight: bold; font-size: 1.1em;">{net_fmt}</td>
             </tr>
 '''
     
@@ -608,10 +933,11 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
     
     <script>
         const transactionData = {txns_json};
+        const transferPairData = {json.dumps(monthly_pairs)};
         
         const categoryNames = {{
             'income': 'Income',
-            'internal_transfer': 'Internal Transfers',
+            'internal_transfer': 'Internal Transfers (NET)',
             'external_transfer': 'External Transfers',
             'credits': 'Credits/Refunds',
             'spending': 'Spending'
@@ -619,6 +945,7 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
         
         function showTransactions(month, category, monthDisplay) {{
             const txns = transactionData[month]?.[category] || [];
+            const pairs = transferPairData[month] || [];
             const modal = document.getElementById('txnModal');
             const title = document.getElementById('modalTitle');
             const count = document.getElementById('txnCount');
@@ -630,7 +957,12 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
             const totalFormatted = total >= 0 
                 ? `+${{total.toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`
                 : `-${{Math.abs(total).toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`;
-            count.textContent = `${{txns.length}} transactions, Total: ${{totalFormatted}}`; 
+            
+            let countText = `${{txns.length}} transactions, Total: ${{totalFormatted}}`;
+            if (category === 'internal_transfer' && pairs.length > 0) {{
+                countText += ` (includes ${{pairs.length}} transfer pairs)`;
+            }}
+            count.textContent = countText;
             
             // Sort by date, then by amount
             txns.sort((a, b) => {{
@@ -643,10 +975,18 @@ def generate_html(monthly_data: dict, monthly_txns: dict, output_path: str):
                 const amtStr = t.amount >= 0 
                     ? `+${{t.amount.toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`
                     : `-${{Math.abs(t.amount).toLocaleString('en-US', {{minimumFractionDigits: 2, maximumFractionDigits: 2}})}}`;
+                
+                let description = escapeHtml(t.description);
+                if (t.is_pair) {{
+                    const pairType = t.pair_info.pair_type || 'unknown';
+                    const typeLabel = pairType === 'credit_card_payment' ? 'CC PAYMENT' : 'INTERNAL';
+                    description += ' <span style="color: #666; font-size: 0.8em;">[' + typeLabel + ': ' + t.pair_info.days_diff + ' day lag]</span>';
+                }}
+                
                 return `
                     <tr>
                         <td>${{t.date}}</td>
-                        <td>${{escapeHtml(t.description)}}</td>
+                        <td>${{description}}</td>
                         <td>${{escapeHtml(t.account_name)}}</td>
                         <td>${{escapeHtml(t.institution)}}</td>
                         <td class="amount ${{amtClass}}">${{amtStr}}</td>
@@ -713,15 +1053,15 @@ def main():
         sys.exit(1)
     
     print(f"Loading transactions from: {input_csv}")
-    transactions = load_transactions(input_csv)
+    transactions, transfer_pairs, excluded_ids, pair_summaries = load_transactions(input_csv)
     print(f"Loaded {len(transactions)} transactions")
     
     print("Aggregating by month...")
-    monthly_data, monthly_txns = aggregate_by_month(transactions)
+    monthly_data, monthly_txns, monthly_pairs = aggregate_by_month(transactions, excluded_ids, pair_summaries)
     print(f"Found {len(monthly_data)} months of data")
     
     print(f"Generating HTML report...")
-    generate_html(monthly_data, monthly_txns, output_html)
+    generate_html(monthly_data, monthly_txns, monthly_pairs, transfer_pairs, pair_summaries, output_html)
 
 
 if __name__ == '__main__':
