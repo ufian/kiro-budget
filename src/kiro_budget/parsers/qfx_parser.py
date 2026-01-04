@@ -2,12 +2,20 @@
 
 import logging
 import os
+import warnings
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
 
 from ofxparse import OfxParser
 from ofxparse.ofxparse import OfxParserException
+
+# Suppress XML parsing warnings by using proper XML parser
+try:
+    from bs4 import XMLParsedAsHTMLWarning
+    warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+except ImportError:
+    pass
 
 from .base import FileParser, DataTransformer
 from ..models.core import Transaction, ParserConfig
@@ -151,20 +159,30 @@ class QFXParser(FileParser):
         """Extract account information from OFX account data"""
         try:
             # Try to get account ID from various possible fields
+            account_id = None
+            
             if hasattr(account, 'account_id') and account.account_id:
                 account_id = str(account.account_id)
             elif hasattr(account, 'number') and account.number:
                 account_id = str(account.number)
             elif hasattr(account, 'routing_number') and account.routing_number:
                 account_id = str(account.routing_number)
-            else:
-                account_id = 'unknown'
             
-            # Return last 4 digits if it looks like an account number
-            if len(account_id) > 4 and account_id.replace('-', '').isdigit():
+            if not account_id:
+                return 'unknown'
+            
+            # Clean up account ID - remove pipes and other separators, get meaningful part
+            if '|' in account_id:
+                # For AmEx format like "BS05T27OEM1HAQV|21001", use the part after the pipe
+                parts = account_id.split('|')
+                account_id = parts[-1] if len(parts) > 1 else parts[0]
+            
+            # Return last 4 digits if it looks like an account number (all digits)
+            if account_id.replace('-', '').replace(' ', '').isdigit() and len(account_id) > 4:
                 return account_id[-4:]
             
-            return account_id
+            # For non-numeric account IDs, return the cleaned ID (up to 10 chars for readability)
+            return account_id[:10] if len(account_id) > 10 else account_id
             
         except Exception as e:
             self.error_handler.log_warning(

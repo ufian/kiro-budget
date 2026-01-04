@@ -1,0 +1,838 @@
+# Common Merchant Patterns
+# ========================
+# Comprehensive collection of merchant patterns for major retailers and service providers
+# Use this as a reference for adding patterns to your categories configuration
+
+version: '1.0'
+default_category: Uncategorized
+confidence_threshold: 0.75
+
+categories:
+  # Major Grocery Chains
+  # ===================
+  
+  Groceries:
+    patterns:
+    # Warehouse Clubs
+    - pattern: COSTCO
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SAM'S CLUB
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: BJ'S WHOLESALE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    
+    # Premium/Organic Chains
+    - pattern: WHOLE FOODS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: TRADER JOE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: FRESH MARKET
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SPROUTS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Major Regional Chains
+    - pattern: KROGER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SAFEWAY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ALBERTSONS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PUBLIX
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: H-E-B
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: WEGMANS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: GIANT FOOD
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: STOP & SHOP
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: FOOD LION
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: HARRIS TEETER
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: FRED MEYER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: KING SOOPERS
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: SMITH'S
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: RALPHS
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: VONS
+      confidence: 0.85
+      type: substring
+      specificity: high
+    
+    # Discount Chains
+    - pattern: ALDI
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: LIDL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: FOOD 4 LESS
+      confidence: 0.85
+      type: substring
+      specificity: high
+
+  # Gas Stations
+  # ===========
+  
+  Gas:
+    patterns:
+    # Warehouse Club Gas (Most Specific)
+    - pattern: COSTCO GAS
+      confidence: 0.95
+      type: substring
+      specificity: very_high
+    - pattern: SAM'S CLUB GAS
+      confidence: 0.95
+      type: substring
+      specificity: very_high
+    - pattern: BJ'S GAS
+      confidence: 0.95
+      type: substring
+      specificity: very_high
+    
+    # Major Oil Companies
+    - pattern: SHELL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: EXXON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MOBIL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHEVRON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: BP
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: TEXACO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CITGO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: VALERO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MARATHON
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: PHILLIPS 66
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CONOCO
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: ARCO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Regional/Convenience Store Gas
+    - pattern: SPEEDWAY
+      confidence: 0.85
+      type: substring
+      specificity: high
+    - pattern: WAWA
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: SHEETZ
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: 7-ELEVEN
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: CIRCLE K
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: CASEY'S
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: KWIK TRIP
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: RACETRAC
+      confidence: 0.85
+      type: substring
+      specificity: medium
+
+  # Fast Food Chains
+  # ===============
+  
+  Restaurants:
+    patterns:
+    # Major Fast Food
+    - pattern: MCDONALD
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: BURGER KING
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: WENDY'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: TACO BELL
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: KFC
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SUBWAY
+      confidence: 0.90
+      type: substring
+      specificity: medium
+    - pattern: CHICK-FIL-A
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: POPEYES
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: ARBY'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: JACK IN THE BOX
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: CARL'S JR
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: HARDEE'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: WHITE CASTLE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: IN-N-OUT
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: WHATABURGER
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SONIC
+      confidence: 0.90
+      type: substring
+      specificity: medium
+    - pattern: DAIRY QUEEN
+      confidence: 0.90
+      type: substring
+      specificity: medium
+    
+    # Fast Casual
+    - pattern: CHIPOTLE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: PANERA
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: QDOBA
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: MOE'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: FIVE GUYS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SHAKE SHACK
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: NOODLES & COMPANY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Pizza Chains
+    - pattern: DOMINO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PIZZA HUT
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: PAPA JOHN
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: LITTLE CAESARS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PAPA MURPHY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CASEY'S PIZZA
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Coffee Chains
+    - pattern: STARBUCKS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: DUNKIN
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PEET'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CARIBOU
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: TIM HORTONS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Casual Dining
+    - pattern: OLIVE GARDEN
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: APPLEBEE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHILI'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: TGI FRIDAY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: RED LOBSTER
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: OUTBACK
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: TEXAS ROADHOUSE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CRACKER BARREL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: DENNY'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: IHOP
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: RED ROBIN
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  # Department Stores & Retail
+  # ==========================
+  
+  Shopping:
+    patterns:
+    # Major Department Stores
+    - pattern: TARGET
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: WALMART
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MACY'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: NORDSTROM
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: KOHL'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: JC PENNEY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SEARS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: DILLARD'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: BLOOMINGDALE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: NEIMAN MARCUS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SAKS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Discount Retailers
+    - pattern: DOLLAR TREE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: DOLLAR GENERAL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: FAMILY DOLLAR
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: 99 CENT
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    
+    # Online Retailers
+    - pattern: AMAZON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: EBAY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ETSY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Electronics
+    - pattern: BEST BUY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: APPLE STORE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: MICROSOFT STORE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: GAMESTOP
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: RADIO SHACK
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Home Improvement
+    - pattern: HOME DEPOT
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: LOWE'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MENARDS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ACE HARDWARE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Clothing Stores
+    - pattern: GAP
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: OLD NAVY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: BANANA REPUBLIC
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: H&M
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ZARA
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: FOREVER 21
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: AMERICAN EAGLE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ABERCROMBIE
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  # Pharmacies & Healthcare
+  # ======================
+  
+  Healthcare:
+    patterns:
+    # Major Pharmacy Chains
+    - pattern: CVS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: WALGREENS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: RITE AID
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: DUANE READE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: KAISER PHARMACY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    
+    # Healthcare Systems
+    - pattern: KAISER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SUTTER HEALTH
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MAYO CLINIC
+      confidence: 0.95
+      type: substring
+      specificity: high
+
+  # Utilities & Services
+  # ===================
+  
+  Utilities:
+    patterns:
+    # Electric Companies
+    - pattern: PG&E
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SOUTHERN CALIFORNIA EDISON
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: DUKE ENERGY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: FLORIDA POWER
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: GEORGIA POWER
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: COMMONWEALTH EDISON
+      confidence: 0.95
+      type: substring
+      specificity: high
+    
+    # Internet/Cable Providers
+    - pattern: COMCAST
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: XFINITY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: VERIZON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: AT&T
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SPECTRUM
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: COX
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: OPTIMUM
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHARTER
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    
+    # Phone Carriers
+    - pattern: T-MOBILE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SPRINT
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  # Transportation
+  # =============
+  
+  Transportation:
+    patterns:
+    # Rideshare
+    - pattern: UBER
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: LYFT
+      confidence: 0.95
+      type: substring
+      specificity: high
+    
+    # Airlines
+    - pattern: SOUTHWEST
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: DELTA
+      confidence: 0.80
+      type: substring
+      specificity: low
+    - pattern: AMERICAN AIR
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: UNITED
+      confidence: 0.75
+      type: substring
+      specificity: low
+    - pattern: JETBLUE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ALASKA AIR
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: SPIRIT
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: FRONTIER
+      confidence: 0.80
+      type: substring
+      specificity: medium
+
+  # Entertainment & Streaming
+  # ========================
+  
+  Entertainment:
+    patterns:
+    # Streaming Services
+    - pattern: NETFLIX
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: HULU
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: DISNEY+
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: HBO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: AMAZON PRIME
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: YOUTUBE
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: PARAMOUNT+
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: PEACOCK
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: APPLE TV
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Music Services
+    - pattern: SPOTIFY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: APPLE MUSIC
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: PANDORA
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: AMAZON MUSIC
+      confidence: 0.90
+      type: substring
+      specificity: high
+    
+    # Movie Theaters
+    - pattern: AMC
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: REGAL
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: CINEMARK
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+# AI Configuration
+# ===============
+ai_config:
+  enabled: true
+  primary_service: openai
+  fallback_service: claude
+  cache_responses: true
+  max_cost_per_month: 50.0
+
+# ML Configuration
+# ===============
+ml_config:
+  enabled: true
+  model_type: random_forest
+  confidence_threshold: 0.6
+  retrain_threshold: 100

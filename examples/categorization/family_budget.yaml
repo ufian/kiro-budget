@@ -1,0 +1,893 @@
+# Family Budget Categories Configuration
+# =====================================
+# Optimized for family financial management with children
+# Focus on family-specific expenses like childcare, education, and activities
+
+version: '1.0'
+default_category: Uncategorized
+confidence_threshold: 0.75
+
+categories:
+  # Essential Family Expenses
+  # ========================
+
+  Groceries:
+    # Family food shopping and household essentials
+    patterns:
+    # Major grocery chains
+    - pattern: COSTCO
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SAM'S CLUB
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: WHOLE FOODS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: TRADER JOE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SAFEWAY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: KROGER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PUBLIX
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: TARGET
+      confidence: 0.85
+      type: substring
+      specificity: medium  # Could be groceries or other shopping
+    - pattern: WALMART
+      confidence: 0.85
+      type: substring
+      specificity: medium  # Could be groceries or other shopping
+    # Generic patterns
+    - pattern: .*GROCERY.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*MARKET.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*SUPERMARKET.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  Housing:
+    # Family housing expenses
+    patterns:
+    - pattern: .*RENT.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*MORTGAGE.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*PROPERTY TAX.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*HOA.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*HOMEOWNERS.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  Utilities:
+    # Family home utilities
+    patterns:
+    # Electric and gas
+    - pattern: .*ELECTRIC.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*POWER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: PG&E
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: .*GAS COMPANY.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    # Water and sewer
+    - pattern: .*WATER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*SEWER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    # Internet, cable, and phone
+    - pattern: .*INTERNET.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*CABLE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: COMCAST
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: XFINITY
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: VERIZON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: AT&T
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: T-MOBILE
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  # Children & Family Care
+  # =====================
+
+  Childcare:
+    # Daycare, babysitting, and childcare services
+    patterns:
+    - pattern: .*DAYCARE.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*CHILDCARE.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*BABYSITTER.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*NANNY.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*PRESCHOOL.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*AFTER SCHOOL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*SUMMER CAMP.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  Education:
+    # School expenses and educational materials
+    patterns:
+    - pattern: .*SCHOOL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*TUITION.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*SCHOOL FEES.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*TEXTBOOK.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*SCHOOL SUPPLIES.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*LUNCH MONEY.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*FIELD TRIP.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*TUTORING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  Kids_Activities:
+    # Children's sports, lessons, and activities
+    patterns:
+    - pattern: .*SOCCER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*BASEBALL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*BASKETBALL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*DANCE.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*MUSIC LESSON.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PIANO.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*GUITAR.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*KARATE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*MARTIAL ARTS.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*SWIMMING.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*YMCA.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  Kids_Clothing:
+    # Children's clothing and shoes
+    patterns:
+    - pattern: .*KIDS.*CLOTHES.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*CHILDREN.*CLOTHING.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: CARTER'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHILDREN'S PLACE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: GYMBOREE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: GAP KIDS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: OLD NAVY
+      confidence: 0.80
+      type: substring
+      specificity: medium  # Could be adult clothing too
+
+  # Transportation
+  # =============
+
+  Gas:
+    # Family vehicle fuel
+    patterns:
+    # Specific gas + location combinations
+    - pattern: COSTCO GAS
+      confidence: 0.95
+      type: substring
+      specificity: very_high
+    - pattern: SAM'S CLUB GAS
+      confidence: 0.95
+      type: substring
+      specificity: very_high
+    # Major gas stations
+    - pattern: SHELL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHEVRON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: EXXON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: BP
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: ARCO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: MOBIL
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Generic gas patterns
+    - pattern: .*GAS.*
+      confidence: 0.85
+      type: regex
+      specificity: high
+    - pattern: .*FUEL.*
+      confidence: 0.85
+      type: regex
+      specificity: high
+
+  Car_Maintenance:
+    # Family vehicle maintenance
+    patterns:
+    - pattern: .*AUTO.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*AUTOMOTIVE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*OIL CHANGE.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*TIRE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CAR WASH.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: JIFFY LUBE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: VALVOLINE
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  Transportation:
+    # Public transit, rideshare, and other transport
+    patterns:
+    - pattern: UBER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: LYFT
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: .*PARKING.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*TRANSIT.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*METRO.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+
+  # Food & Dining
+  # =============
+
+  Restaurants:
+    # Family dining out
+    patterns:
+    # Family-friendly fast food
+    - pattern: MCDONALD
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: BURGER KING
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: TACO BELL
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: SUBWAY
+      confidence: 0.90
+      type: substring
+      specificity: medium
+    - pattern: KFC
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: WENDY'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: CHIPOTLE
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: PANERA
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: CHICK-FIL-A
+      confidence: 0.95
+      type: substring
+      specificity: high
+    # Family restaurants
+    - pattern: OLIVE GARDEN
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: APPLEBEE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: CHILI'S
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: RED ROBIN
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Pizza places
+    - pattern: .*PIZZA.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: DOMINO
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: PAPA JOHN
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Coffee (often with kids)
+    - pattern: STARBUCKS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: DUNKIN
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Generic patterns
+    - pattern: .*RESTAURANT.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CAFE.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+
+  # Health & Personal Care
+  # =====================
+
+  Healthcare:
+    # Family medical and dental expenses
+    patterns:
+    - pattern: .*MEDICAL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*HOSPITAL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*CLINIC.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*PEDIATRIC.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*PEDIATRICIAN.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*DENTAL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*ORTHODONTIC.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*BRACES.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*DOCTOR.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*PHARMACY.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: CVS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: WALGREENS
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: RITE AID
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  Personal_Care:
+    # Family personal care and grooming
+    patterns:
+    - pattern: .*SALON.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*BARBER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*HAIRCUT.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*SPA.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: ULTA
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: SEPHORA
+      confidence: 0.85
+      type: substring
+      specificity: medium
+
+  # Shopping & Entertainment
+  # =======================
+
+  Shopping:
+    # Family shopping and household items
+    patterns:
+    # Online shopping
+    - pattern: AMAZON
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: EBAY
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    # Department stores
+    - pattern: TARGET
+      confidence: 0.85
+      type: substring
+      specificity: medium  # Could be groceries too
+    - pattern: WALMART
+      confidence: 0.85
+      type: substring
+      specificity: medium  # Could be groceries too
+    - pattern: MACY'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: KOHL'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: JC PENNEY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Electronics and tech
+    - pattern: BEST BUY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: APPLE STORE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Home improvement
+    - pattern: HOME DEPOT
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: LOWE'S
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  Family_Entertainment:
+    # Family entertainment and activities
+    patterns:
+    # Streaming services
+    - pattern: NETFLIX
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: DISNEY+
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: HULU
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: HBO
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: AMAZON PRIME
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: YOUTUBE
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    # Music services
+    - pattern: SPOTIFY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: APPLE MUSIC
+      confidence: 0.90
+      type: substring
+      specificity: high
+    # Movies and entertainment venues
+    - pattern: .*THEATER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CINEMA.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*MOVIE.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: AMC
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: REGAL
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    # Family entertainment venues
+    - pattern: .*ZOO.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*AQUARIUM.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*MUSEUM.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*AMUSEMENT PARK.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: DISNEYLAND
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: DISNEY WORLD
+      confidence: 0.95
+      type: substring
+      specificity: high
+
+  Toys_Games:
+    # Children's toys and games
+    patterns:
+    - pattern: .*TOY.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: TOYS R US
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: .*GAME.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*LEGO.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*NINTENDO.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*XBOX.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*PLAYSTATION.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+
+  # Financial & Insurance
+  # ====================
+
+  Insurance:
+    # Family insurance premiums
+    patterns:
+    - pattern: .*INSURANCE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*AUTO INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*HEALTH INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*LIFE INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*HOME INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  Savings:
+    # Family savings and investments
+    patterns:
+    - pattern: .*SAVINGS.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*529.*
+      confidence: 0.95
+      type: regex
+      specificity: high  # College savings plan
+    - pattern: .*COLLEGE FUND.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*401K.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*IRA.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  Banking:
+    # Banking fees and services
+    patterns:
+    - pattern: .*ATM.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*FEE.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*OVERDRAFT.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+
+  # Income & Transfers
+  # =================
+
+  Income:
+    # Family income sources
+    patterns:
+    - pattern: .*PAYROLL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*SALARY.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: DIRECT DEP
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: .*DEPOSIT.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*CHILD SUPPORT.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*TAX REFUND.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+
+  Transfers:
+    # Internal account transfers
+    patterns:
+    - pattern: .*TRANSFER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: ONLINE TRANSFER
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: .*PAYMENT.*
+      confidence: 0.70
+      type: regex
+      specificity: low
+
+# AI Configuration for Family Use
+# ==============================
+ai_config:
+  enabled: true
+  primary_service: openai
+  fallback_service: claude
+  cache_responses: true
+  max_cost_per_month: 40.0  # Moderate limit for family use
+  rate_limit_per_minute: 20
+
+# ML Configuration
+# ===============
+ml_config:
+  enabled: true
+  model_type: random_forest
+  confidence_threshold: 0.65
+  retrain_threshold: 75  # Retrain more frequently for family patterns
+  features:
+    use_text_features: true
+    use_amount_features: true
+    use_temporal_features: true
+    use_account_features: true

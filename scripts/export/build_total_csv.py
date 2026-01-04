@@ -37,8 +37,15 @@ def find_all_csv_files(data_dir: str) -> list:
     if not data_path.exists():
         raise FileNotFoundError(f"Data directory not found: {data_dir}")
     
+    # Directories to exclude from CSV file search
+    excluded_dirs = {"total", "reports", "backups", "processed"}
+    
     # Recursively find all CSV files
     for csv_file in data_path.rglob("*.csv"):
+        # Skip files in excluded directories
+        if any(excluded_dir in csv_file.parts for excluded_dir in excluded_dirs):
+            continue
+            
         # Skip the total CSV files if they already exist
         if csv_file.name not in ["total.csv", "all_transactions.csv"]:
             csv_files.append(str(csv_file))
@@ -94,10 +101,50 @@ def clean_and_deduplicate(df: pd.DataFrame, logger) -> pd.DataFrame:
     # Sort by date, then by amount, then by description for consistent ordering
     df = df.sort_values(['date', 'amount', 'description'], ascending=[True, True, True])
     
-    # First pass: Remove exact duplicates
-    duplicate_cols = ['date', 'amount', 'description', 'account', 'institution']
+    # First pass: Remove exact duplicates based on core transaction fields
+    # Include transaction_id to avoid removing legitimate separate transactions
+    # (like multiple airline tickets purchased on the same day)
+    core_duplicate_cols = ['date', 'amount', 'description', 'account', 'institution', 'transaction_id']
     initial_count = len(df)
-    df = df.drop_duplicates(subset=duplicate_cols, keep='first')
+    
+    # When removing duplicates, prefer rows with more complete information
+    # Sort by completeness of data (non-null values) in descending order
+    df['_completeness_score'] = df.apply(lambda row: sum(1 for val in row if pd.notna(val) and val != ''), axis=1)
+    df = df.sort_values(['date', 'amount', 'description', '_completeness_score'], ascending=[True, True, True, False])
+    
+    # Remove duplicates with smart transaction_id handling
+    # If transactions have different non-empty transaction_ids, they are NOT duplicates
+    # If transactions have same transaction_id, they ARE duplicates  
+    # If one or both lack transaction_id, use core fields for comparison
+    
+    def create_dedup_key(row):
+        """Create a deduplication key that respects transaction_id uniqueness"""
+        # If transaction_id exists and is not empty, use it as primary key
+        if pd.notna(row['transaction_id']) and str(row['transaction_id']).strip():
+            return ('txn_id', str(row['transaction_id']).strip())
+        
+        # Otherwise, use core fields (this allows for legitimate duplicates to be removed
+        # when transaction_id is missing, but preserves separate transactions with unique IDs)
+        return (
+            'core_fields',
+            row['date'].strftime('%Y-%m-%d') if pd.notna(row['date']) else '',
+            float(row['amount']) if pd.notna(row['amount']) else 0.0,
+            str(row['description']).strip().lower() if pd.notna(row['description']) else '',
+            str(row['account']).strip().lower() if pd.notna(row['account']) else '',
+            str(row['institution']).strip().lower() if pd.notna(row['institution']) else ''
+        )
+    
+    # Apply deduplication key
+    df['_dedup_key'] = df.apply(create_dedup_key, axis=1)
+    
+    # Remove duplicates based on the smart key, keeping the first (most complete) occurrence
+    df = df.drop_duplicates(subset=['_dedup_key'], keep='first')
+    
+    # Remove the temporary deduplication key
+    df = df.drop(columns=['_dedup_key'])
+    
+    # Remove the temporary completeness score column
+    df = df.drop(columns=['_completeness_score'])
     
     exact_duplicates_removed = initial_count - len(df)
     if exact_duplicates_removed > 0:
@@ -188,6 +235,7 @@ def clean_and_deduplicate(df: pd.DataFrame, logger) -> pd.DataFrame:
         logger.info(f"  Removed {len(indices_to_remove)} PDF vs QFX duplicate transactions")
     else:
         logger.info("  No PDF vs QFX duplicates found")
+    
     # Reset index
     df = df.reset_index(drop=True)
     

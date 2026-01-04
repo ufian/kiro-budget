@@ -7,11 +7,14 @@ import os
 import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional, Type, Any
+from typing import Dict, List, Optional, Type, Any, TYPE_CHECKING
 import logging
 
 from ..models.core import ParserConfig
-from ..parsers.base import FileParser
+
+# Use TYPE_CHECKING to avoid circular import
+if TYPE_CHECKING:
+    from ..parsers.base import FileParser
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +29,7 @@ class ParserPlugin(ABC):
         pass
     
     @abstractmethod
-    def get_parser_class(self) -> Type[FileParser]:
+    def get_parser_class(self) -> Type['FileParser']:
         """Return the parser class this plugin provides"""
         pass
     
@@ -82,7 +85,7 @@ class PluginManager:
             config: Parser configuration containing plugin directories
         """
         self.config = config
-        self.registered_parsers: Dict[str, Type[FileParser]] = {}
+        self.registered_parsers: Dict[str, Type['FileParser']] = {}
         self.registered_plugins: Dict[str, ParserPlugin] = {}
         self._plugin_priorities: Dict[str, int] = {}
         
@@ -201,7 +204,7 @@ class PluginManager:
                 except Exception as e:
                     logger.error(f"Error instantiating plugin {name} from {file_path}: {e}")
     
-    def register_parser(self, name: str, parser_class: Type[FileParser], priority: int = 0) -> None:
+    def register_parser(self, name: str, parser_class: Type['FileParser'], priority: int = 0) -> None:
         """Register a parser class
         
         Args:
@@ -209,6 +212,9 @@ class PluginManager:
             parser_class: Parser class to register
             priority: Priority level (higher = more preferred)
         """
+        # Import FileParser locally to avoid circular import
+        from ..parsers.base import FileParser
+        
         if not issubclass(parser_class, FileParser):
             raise ValueError(f"Parser class must inherit from FileParser: {parser_class}")
             
@@ -240,7 +246,7 @@ class PluginManager:
         
         logger.info(f"Registered plugin: {plugin_name}")
     
-    def get_parser_for_file(self, file_path: str, institution: str = None) -> Optional[FileParser]:
+    def get_parser_for_file(self, file_path: str, institution: str = None) -> Optional['FileParser']:
         """Get appropriate parser for a file
         
         Args:
@@ -284,7 +290,7 @@ class PluginManager:
         logger.warning(f"No parser found for file: {file_path}")
         return None
     
-    def get_parser_by_type(self, parser_type: str) -> Optional[FileParser]:
+    def get_parser_by_type(self, parser_type: str) -> Optional['FileParser']:
         """Get parser by type name
         
         Args:
@@ -358,7 +364,7 @@ class PluginManager:
 class SimpleParserPlugin(ParserPlugin):
     """Simple implementation of ParserPlugin for easy plugin creation"""
     
-    def __init__(self, name: str, parser_class: Type[FileParser], 
+    def __init__(self, name: str, parser_class: Type['FileParser'], 
                  institutions: List[str], extensions: List[str], priority: int = 0):
         """Initialize simple plugin
         
@@ -378,7 +384,7 @@ class SimpleParserPlugin(ParserPlugin):
     def get_name(self) -> str:
         return self._name
     
-    def get_parser_class(self) -> Type[FileParser]:
+    def get_parser_class(self) -> Type['FileParser']:
         return self._parser_class
     
     def get_supported_institutions(self) -> List[str]:

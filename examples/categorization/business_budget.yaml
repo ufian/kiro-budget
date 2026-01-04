@@ -1,0 +1,626 @@
+# Business Budget Categories Configuration
+# =======================================
+# Optimized for small business and freelancer expense tracking
+# Focus on tax-deductible business expenses and revenue categories
+
+version: '1.0'
+default_category: Uncategorized
+confidence_threshold: 0.80  # Higher threshold for business accuracy
+
+categories:
+  # Revenue & Income
+  # ===============
+
+  Revenue:
+    # Business income and sales
+    patterns:
+    - pattern: .*INVOICE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PAYMENT RECEIVED.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*CLIENT PAYMENT.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: STRIPE
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: PAYPAL
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: SQUARE
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: .*SALES.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+
+  # Office & Operations
+  # ==================
+
+  Office_Supplies:
+    # Office materials and supplies
+    patterns:
+    - pattern: .*OFFICE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*SUPPLIES.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: STAPLES
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: OFFICE DEPOT
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: .*PAPER.*
+      confidence: 0.70
+      type: regex
+      specificity: low
+    - pattern: .*PRINTER.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*INK.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+
+  Equipment:
+    # Business equipment and hardware
+    patterns:
+    - pattern: .*COMPUTER.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*LAPTOP.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*MONITOR.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: BEST BUY
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: APPLE STORE
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: .*ELECTRONICS.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*HARDWARE.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+
+  Software:
+    # Software subscriptions and licenses
+    patterns:
+    - pattern: .*SOFTWARE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: MICROSOFT
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: ADOBE
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: .*SUBSCRIPTION.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*LICENSE.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: GITHUB
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: AWS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: GOOGLE CLOUD
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: DROPBOX
+      confidence: 0.85
+      type: substring
+      specificity: medium
+
+  # Communications & Marketing
+  # =========================
+
+  Internet_Phone:
+    # Business internet and phone services
+    patterns:
+    - pattern: .*INTERNET.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*PHONE.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*TELECOM.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: COMCAST
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: VERIZON
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: AT&T
+      confidence: 0.85
+      type: substring
+      specificity: medium
+
+  Marketing:
+    # Advertising and marketing expenses
+    patterns:
+    - pattern: .*ADVERTISING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*MARKETING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: GOOGLE ADS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: FACEBOOK ADS
+      confidence: 0.95
+      type: substring
+      specificity: high
+    - pattern: .*PROMOTION.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CAMPAIGN.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+
+  Website:
+    # Website and domain expenses
+    patterns:
+    - pattern: .*DOMAIN.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*HOSTING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*WEBSITE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: GODADDY
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: NAMECHEAP
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: BLUEHOST
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: WORDPRESS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+
+  # Professional Services
+  # ====================
+
+  Legal_Professional:
+    # Legal and professional services
+    patterns:
+    - pattern: .*LEGAL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*ATTORNEY.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*LAWYER.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*LAW FIRM.*
+      confidence: 0.95
+      type: regex
+      specificity: high
+    - pattern: .*CONSULTING.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CONSULTANT.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  Accounting:
+    # Accounting and bookkeeping services
+    patterns:
+    - pattern: .*ACCOUNTING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*BOOKKEEPING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*CPA.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*TAX PREP.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: H&R BLOCK
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: TURBOTAX
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: QUICKBOOKS
+      confidence: 0.90
+      type: substring
+      specificity: high
+
+  # Travel & Transportation
+  # ======================
+
+  Business_Travel:
+    # Business travel expenses
+    patterns:
+    - pattern: .*AIRLINE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*FLIGHT.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*HOTEL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*LODGING.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: EXPEDIA
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: BOOKING.COM
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: AIRBNB
+      confidence: 0.80
+      type: substring
+      specificity: medium
+
+  Vehicle_Business:
+    # Business vehicle expenses
+    patterns:
+    - pattern: .*BUSINESS.*GAS.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*MILEAGE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PARKING.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*TOLL.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: UBER
+      confidence: 0.75
+      type: substring
+      specificity: low  # Could be personal
+    - pattern: LYFT
+      confidence: 0.75
+      type: substring
+      specificity: low  # Could be personal
+
+  # Meals & Entertainment
+  # ====================
+
+  Business_Meals:
+    # Business meals and client entertainment
+    patterns:
+    - pattern: .*BUSINESS.*MEAL.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*CLIENT.*LUNCH.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*MEETING.*RESTAURANT.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    # Note: Regular restaurant patterns should be lower confidence
+    # as they could be personal meals
+    - pattern: .*RESTAURANT.*
+      confidence: 0.60
+      type: regex
+      specificity: low
+    - pattern: .*COFFEE.*
+      confidence: 0.55
+      type: regex
+      specificity: low
+
+  # Utilities & Facilities
+  # =====================
+
+  Office_Utilities:
+    # Office utilities and facilities
+    patterns:
+    - pattern: .*OFFICE.*RENT.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*COWORKING.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*WORKSPACE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: WEWORK
+      confidence: 0.90
+      type: substring
+      specificity: high
+    - pattern: .*STORAGE.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+
+  # Banking & Fees
+  # ==============
+
+  Banking_Fees:
+    # Business banking fees
+    patterns:
+    - pattern: .*BUSINESS.*FEE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*MERCHANT.*FEE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PROCESSING.*FEE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*WIRE.*FEE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*ACH.*FEE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  # Education & Training
+  # ===================
+
+  Training:
+    # Professional development and training
+    patterns:
+    - pattern: .*TRAINING.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*COURSE.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+    - pattern: .*CONFERENCE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*SEMINAR.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*CERTIFICATION.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: UDEMY
+      confidence: 0.80
+      type: substring
+      specificity: medium
+    - pattern: COURSERA
+      confidence: 0.80
+      type: substring
+      specificity: medium
+
+  # Insurance & Taxes
+  # ================
+
+  Business_Insurance:
+    # Business insurance premiums
+    patterns:
+    - pattern: .*BUSINESS.*INSURANCE.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*LIABILITY.*INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PROFESSIONAL.*INSURANCE.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*ERRORS.*OMISSIONS.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  Business_Taxes:
+    # Business tax payments
+    patterns:
+    - pattern: .*BUSINESS.*TAX.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*QUARTERLY.*TAX.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*ESTIMATED.*TAX.*
+      confidence: 0.95
+      type: regex
+      specificity: very_high
+    - pattern: .*SALES.*TAX.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*PAYROLL.*TAX.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+
+  # Miscellaneous Business
+  # =====================
+
+  Shipping:
+    # Shipping and postage
+    patterns:
+    - pattern: .*SHIPPING.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*POSTAGE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: UPS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: FEDEX
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: USPS
+      confidence: 0.85
+      type: substring
+      specificity: medium
+    - pattern: .*MAIL.*
+      confidence: 0.75
+      type: regex
+      specificity: low
+
+  Licenses_Permits:
+    # Business licenses and permits
+    patterns:
+    - pattern: .*LICENSE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*PERMIT.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+    - pattern: .*REGISTRATION.*
+      confidence: 0.80
+      type: regex
+      specificity: medium
+    - pattern: .*FILING.*FEE.*
+      confidence: 0.85
+      type: regex
+      specificity: medium
+
+  # Personal (Non-Deductible)
+  # =========================
+
+  Personal_Expenses:
+    # Personal expenses that shouldn't be business deductions
+    patterns:
+    - pattern: .*PERSONAL.*
+      confidence: 0.90
+      type: regex
+      specificity: high
+    - pattern: .*GROCERY.*
+      confidence: 0.70
+      type: regex
+      specificity: low  # Usually personal
+    - pattern: .*ENTERTAINMENT.*
+      confidence: 0.60
+      type: regex
+      specificity: low  # Usually personal unless client-related
+
+# AI Configuration for Business Use
+# ================================
+ai_config:
+  enabled: true
+  primary_service: openai
+  fallback_service: claude
+  cache_responses: true
+  max_cost_per_month: 100.0  # Higher limit for business use
+  rate_limit_per_minute: 30
+
+# ML Configuration
+# ===============
+ml_config:
+  enabled: true
+  model_type: random_forest
+  confidence_threshold: 0.70  # Higher threshold for business accuracy
+  retrain_threshold: 100
+  features:
+    use_text_features: true
+    use_amount_features: true
+    use_temporal_features: true
+    use_account_features: true

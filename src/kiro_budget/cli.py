@@ -1429,5 +1429,664 @@ gemini:
         sys.exit(1)
 
 
+@cli.command('categorize')
+@click.option('--input', '-i', default=None,
+              help='Input CSV file (default: data/total/all_transactions.csv)')
+@click.option('--output', '-o', default=None,
+              help='Output CSV file (default: overwrite input file)')
+@click.option('--categories', '-c', default='categories.yaml',
+              help='Categories configuration file (default: categories.yaml)')
+@click.option('--batch-size', default=1000,
+              help='Batch size for processing (default: 1000)')
+@click.pass_context
+def categorize_transactions(ctx, input, output, categories, batch_size):
+    """Add category information to transaction CSV file.
+    
+    This command reads a consolidated transaction CSV file and applies
+    categorization to each transaction using pattern matching and AI.
+    """
+    cli_instance = ctx.obj['cli']
+    
+    # Set default paths
+    if input is None:
+        input = os.path.join(cli_instance.config.data_directory, 'total', 'all_transactions.csv')
+    
+    if output is None:
+        output = input  # Overwrite input file by default
+    
+    # Check if input file exists
+    if not os.path.exists(input):
+        click.echo(f"✗ Input file not found: {input}")
+        click.echo("Run 'kiro-budget import' first to create the consolidated CSV file.")
+        sys.exit(1)
+    
+    # Check if categories file exists
+    if not os.path.exists(categories):
+        click.echo(f"✗ Categories file not found: {categories}")
+        click.echo("Run 'kiro-budget init-categories' first to create the categories configuration.")
+        sys.exit(1)
+    
+    try:
+        # Import categorization modules
+        from .categorizers.category_engine import CategoryEngine
+        from .categorizers.models import Transaction
+        import pandas as pd
+        
+        click.echo("🏷️  Adding categories to transactions...")
+        click.echo(f"   Input: {input}")
+        click.echo(f"   Output: {output}")
+        click.echo(f"   Categories: {categories}")
+        
+        # Initialize category engine
+        click.echo("   Initializing category engine...")
+        category_engine = CategoryEngine(categories)
+        
+        # Load transactions
+        click.echo("   Loading transactions...")
+        df = pd.read_csv(input)
+        df['date'] = pd.to_datetime(df['date'])
+        click.echo(f"   Loaded {len(df):,} transactions")
+        
+        # Add category columns
+        df['category'] = 'Uncategorized'
+        df['category_confidence'] = 0.0
+        df['category_method'] = 'none'
+        
+        # Process in batches
+        total_batches = (len(df) + batch_size - 1) // batch_size
+        categorized_count = 0
+        
+        with click.progressbar(range(0, len(df), batch_size), 
+                             label='Categorizing', 
+                             length=total_batches) as bar:
+            for i in bar:
+                batch_end = min(i + batch_size, len(df))
+                
+                for idx in range(i, batch_end):
+                    row = df.iloc[idx]
+                    
+                    # Create Transaction object
+                    transaction = Transaction(
+                        date=row['date'],
+                        amount=float(row['amount']),
+                        description=str(row['description']),
+                        account=str(row.get('account', '')),
+                        institution=str(row.get('institution', '')),
+                        transaction_id=f"csv_{idx}"
+                    )
+                    
+                    # Categorize transaction
+                    result = category_engine.categorize_transaction(transaction)
+                    
+                    # Update DataFrame
+                    df.at[idx, 'category'] = result.category
+                    df.at[idx, 'category_confidence'] = result.confidence
+                    df.at[idx, 'category_method'] = result.method
+                    
+                    if result.category != 'Uncategorized':
+                        categorized_count += 1
+        
+        # Reorder columns
+        core_columns = ['date', 'amount', 'description', 'account', 'institution']
+        category_columns = ['category', 'category_confidence', 'category_method']
+        remaining_columns = [col for col in df.columns if col not in core_columns + category_columns]
+        ordered_columns = core_columns + category_columns + remaining_columns
+        df = df[ordered_columns]
+        
+        # Save categorized data
+        os.makedirs(os.path.dirname(output), exist_ok=True)
+        df.to_csv(output, index=False)
+        
+        # Show results
+        categorization_rate = (categorized_count / len(df)) * 100
+        click.echo(f"✓ Categorization completed!")
+        click.echo(f"   Total transactions: {len(df):,}")
+        click.echo(f"   Categorized: {categorized_count:,} ({categorization_rate:.1f}%)")
+        click.echo(f"   Uncategorized: {len(df) - categorized_count:,} ({100 - categorization_rate:.1f}%)")
+        click.echo(f"   Output saved to: {output}")
+        
+    except Exception as e:
+        click.echo(f"✗ Error during categorization: {str(e)}")
+        import traceback
+        if ctx.obj.get('verbose'):
+            click.echo(traceback.format_exc())
+        sys.exit(1)
+
+
+@cli.command('init-categories')
+@click.option('--output', '-o', default='categories.yaml',
+              help='Output path for categories file (default: categories.yaml)')
+@click.option('--force', '-f', is_flag=True,
+              help='Overwrite existing file without confirmation')
+@click.pass_context
+def init_categories(ctx, output, force):
+    """Initialize categories configuration file with default categories.
+    
+    This command creates a categories.yaml file with common spending categories
+    and example patterns for transaction categorization.
+    """
+    # Check if file exists
+    if os.path.exists(output) and not force:
+        click.echo(f"⚠ File already exists: {output}")
+        if not click.confirm("Do you want to overwrite it?"):
+            click.echo("Aborted.")
+            return
+    
+    try:
+        # Import storage module
+        from .categorizers.storage import CategoryStorage
+        
+        click.echo(f"🏷️  Creating categories configuration file...")
+        
+        # Create storage instance and generate default config
+        storage = CategoryStorage(output)
+        storage.create_default_config()
+        
+        click.echo(f"✓ Categories configuration created: {output}")
+        click.echo()
+        click.echo("The file includes common categories like:")
+        click.echo("  • Groceries (Costco, Safeway, etc.)")
+        click.echo("  • Gas (Shell, Chevron, etc.)")
+        click.echo("  • Restaurants (Starbucks, McDonald's, etc.)")
+        click.echo("  • Shopping (Amazon, Target, etc.)")
+        click.echo("  • Utilities (Electric, Internet, etc.)")
+        click.echo("  • And more...")
+        click.echo()
+        click.echo("Next steps:")
+        click.echo(f"  1. Edit {output} to customize categories and patterns")
+        click.echo("  2. Run 'kiro-budget categorize' to apply categories to transactions")
+        
+    except Exception as e:
+        click.echo(f"✗ Error creating categories file: {str(e)}")
+        sys.exit(1)
+
+
+@cli.command('review-categories')
+@click.option('--input', '-i', default=None,
+              help='Input CSV file (default: data/total/all_transactions.csv)')
+@click.option('--categories', '-c', default='categories.yaml',
+              help='Categories configuration file (default: categories.yaml)')
+@click.option('--confidence-threshold', default=0.7, type=float,
+              help='Review transactions below this confidence (default: 0.7)')
+@click.option('--limit', default=50, type=int,
+              help='Maximum number of transactions to review (default: 50)')
+@click.pass_context
+def review_categories(ctx, input, categories, confidence_threshold, limit):
+    """Interactively review and improve transaction categorization.
+    
+    This command helps you review low-confidence categorizations and
+    learn from your feedback to improve future categorization accuracy.
+    """
+    cli_instance = ctx.obj['cli']
+    
+    # Set default paths
+    if input is None:
+        input = os.path.join(cli_instance.config.data_directory, 'total', 'all_transactions.csv')
+    
+    # Check if files exist
+    if not os.path.exists(input):
+        click.echo(f"✗ Input file not found: {input}")
+        click.echo("Run 'kiro-budget categorize' first.")
+        sys.exit(1)
+    
+    if not os.path.exists(categories):
+        click.echo(f"✗ Categories file not found: {categories}")
+        click.echo("Run 'kiro-budget init-categories' first.")
+        sys.exit(1)
+    
+    try:
+        # Import required modules
+        from .categorizers.category_engine import CategoryEngine
+        from .categorizers.user_interaction import UserInteraction
+        from .categorizers.models import Transaction
+        import pandas as pd
+        
+        click.echo("🔍 Starting interactive category review...")
+        click.echo(f"   Input: {input}")
+        click.echo(f"   Categories: {categories}")
+        click.echo(f"   Confidence threshold: {confidence_threshold}")
+        
+        # Initialize components
+        category_engine = CategoryEngine(categories)
+        user_interaction = UserInteraction(category_engine)
+        
+        # Load transactions
+        df = pd.read_csv(input)
+        df['date'] = pd.to_datetime(df['date'])
+        
+        # Filter for low-confidence transactions
+        if 'category_confidence' in df.columns:
+            low_confidence_df = df[df['category_confidence'] < confidence_threshold]
+        else:
+            # If no confidence column, treat all as low confidence
+            low_confidence_df = df
+        
+        if len(low_confidence_df) == 0:
+            click.echo("✓ No low-confidence transactions found!")
+            return
+        
+        # Limit the number of transactions to review
+        review_df = low_confidence_df.head(limit)
+        
+        click.echo(f"   Found {len(low_confidence_df):,} low-confidence transactions")
+        click.echo(f"   Reviewing first {len(review_df):,} transactions")
+        click.echo()
+        
+        # Convert to Transaction objects
+        transactions = []
+        for _, row in review_df.iterrows():
+            transaction = Transaction(
+                date=row['date'],
+                amount=float(row['amount']),
+                description=str(row['description']),
+                account=str(row.get('account', '')),
+                institution=str(row.get('institution', '')),
+                transaction_id=f"review_{len(transactions)}"
+            )
+            transactions.append(transaction)
+        
+        # Start batch review
+        results = user_interaction.batch_review_low_confidence(
+            transactions, confidence_threshold
+        )
+        
+        click.echo()
+        click.echo("✓ Review completed!")
+        click.echo(f"   Reviewed: {results['reviewed']}")
+        click.echo(f"   Learned: {results['learned']}")
+        click.echo(f"   Skipped: {results['skipped']}")
+        
+        if results['learned'] > 0:
+            click.echo()
+            click.echo("💡 New patterns learned! Run 'kiro-budget categorize' again to apply improvements.")
+        
+    except KeyboardInterrupt:
+        click.echo("\n⚠ Review cancelled by user.")
+    except Exception as e:
+        click.echo(f"✗ Error during review: {str(e)}")
+        import traceback
+        if ctx.obj.get('verbose'):
+            click.echo(traceback.format_exc())
+        sys.exit(1)
+
+
+@cli.command('config-categories')
+@click.option('--show', is_flag=True, help='Show current configuration')
+@click.option('--validate', is_flag=True, help='Validate configuration')
+@click.option('--reset', is_flag=True, help='Reset to default configuration')
+@click.option('--backup', is_flag=True, help='Create configuration backup')
+@click.option('--export', help='Export category rules to file')
+@click.option('--import', 'import_file', help='Import category rules from file')
+@click.option('--merge-mode', default='merge', type=click.Choice(['merge', 'replace', 'skip']),
+              help='How to handle conflicts during import (default: merge)')
+@click.pass_context
+def config_categories(ctx, show, validate, reset, backup, export, import_file, merge_mode):
+    """Manage categorization configuration.
+    
+    This command provides comprehensive configuration management for the
+    transaction categorization system, including AI/ML settings and category rules.
+    """
+    try:
+        from .categorizers.config_manager import CategorizationConfigManager
+        
+        config_manager = CategorizationConfigManager()
+        
+        if show:
+            # Show current configuration
+            click.echo("📋 Categorization Configuration")
+            click.echo("=" * 50)
+            
+            summary = config_manager.get_configuration_summary()
+            
+            # General configuration
+            general = summary['general']
+            click.echo(f"Version: {general['version']}")
+            click.echo(f"Default category: {general['default_category']}")
+            click.echo(f"Confidence threshold: {general['confidence_threshold']}")
+            click.echo(f"Total categories: {general['total_categories']}")
+            click.echo(f"Total patterns: {general['total_patterns']}")
+            
+            # Pattern type distribution
+            pattern_types = general['pattern_types']
+            click.echo(f"Pattern types: substring={pattern_types.get('substring', 0)}, "
+                      f"regex={pattern_types.get('regex', 0)}, exact={pattern_types.get('exact', 0)}")
+            click.echo()
+            
+            # AI configuration
+            ai = summary['ai']
+            click.echo("AI Configuration:")
+            click.echo(f"  Enabled: {ai['enabled']}")
+            click.echo(f"  Primary service: {ai['primary_service']}")
+            click.echo(f"  Fallback service: {ai['fallback_service']}")
+            click.echo(f"  Cache responses: {ai['cache_responses']}")
+            click.echo(f"  Max cost per month: ${ai['max_cost_per_month']}")
+            if ai['api_keys_configured']:
+                click.echo(f"  API keys configured: {', '.join(ai['api_keys_configured'])}")
+            click.echo()
+            
+            # ML configuration
+            ml = summary['ml']
+            click.echo("ML Configuration:")
+            click.echo(f"  Enabled: {ml['enabled']}")
+            click.echo(f"  Model type: {ml['model_type']}")
+            click.echo(f"  Confidence threshold: {ml['confidence_threshold']}")
+            click.echo(f"  Retrain threshold: {ml['retrain_threshold']}")
+            click.echo(f"  Model path: {ml['model_path']}")
+        
+        elif validate:
+            # Validate configuration
+            click.echo("🔍 Validating categorization configuration...")
+            
+            validation = config_manager.validate_configuration()
+            
+            if validation['valid']:
+                click.echo("✓ Configuration is valid")
+            else:
+                click.echo("✗ Configuration has issues:")
+                for issue in validation['issues']:
+                    click.echo(f"  - {issue}")
+            
+            if validation['warnings']:
+                click.echo("\n⚠ Warnings:")
+                for warning in validation['warnings']:
+                    click.echo(f"  - {warning}")
+        
+        elif reset:
+            # Reset to defaults
+            if click.confirm("⚠ This will reset all categorization configuration to defaults. Continue?"):
+                config_manager.reset_to_defaults()
+                click.echo("✓ Configuration reset to defaults")
+            else:
+                click.echo("Reset cancelled")
+        
+        elif backup:
+            # Create backup
+            backup_path = config_manager.create_backup()
+            click.echo(f"✓ Configuration backup created: {backup_path}")
+        
+        elif export:
+            # Export category rules
+            format_type = 'yaml' if export.endswith('.yaml') or export.endswith('.yml') else 'json'
+            config_manager.export_category_rules(export, format_type)
+            click.echo(f"✓ Category rules exported to: {export}")
+        
+        elif import_file:
+            # Import category rules
+            if not os.path.exists(import_file):
+                click.echo(f"✗ Import file not found: {import_file}")
+                sys.exit(1)
+            
+            click.echo(f"📥 Importing category rules from: {import_file}")
+            click.echo(f"   Merge mode: {merge_mode}")
+            
+            stats = config_manager.import_category_rules(import_file, merge_mode)
+            
+            click.echo("✓ Import completed:")
+            click.echo(f"  Categories imported: {stats['categories_imported']}")
+            click.echo(f"  Categories replaced: {stats['categories_replaced']}")
+            click.echo(f"  Categories skipped: {stats['categories_skipped']}")
+            click.echo(f"  Patterns imported: {stats['patterns_imported']}")
+            click.echo(f"  Patterns skipped: {stats['patterns_skipped']}")
+            click.echo(f"  Conflicts resolved: {stats['conflicts_resolved']}")
+        
+        else:
+            # Show help
+            click.echo("Use --help to see available configuration options")
+            click.echo("Common commands:")
+            click.echo("  --show              Show current configuration")
+            click.echo("  --validate          Validate configuration")
+            click.echo("  --export rules.yaml Export category rules")
+            click.echo("  --import rules.yaml Import category rules")
+            
+    except Exception as e:
+        click.echo(f"✗ Configuration error: {str(e)}")
+        import traceback
+        if ctx.obj.get('verbose'):
+            click.echo(traceback.format_exc())
+        sys.exit(1)
+
+
+@cli.command('config-ai')
+@click.option('--enable/--disable', default=None, help='Enable or disable AI categorization')
+@click.option('--primary-service', type=click.Choice(['openai', 'claude']), 
+              help='Set primary AI service')
+@click.option('--fallback-service', type=click.Choice(['openai', 'claude', 'none']), 
+              help='Set fallback AI service')
+@click.option('--max-cost', type=float, help='Set maximum monthly cost limit')
+@click.option('--set-api-key', help='Set API key for service (format: service:key)')
+@click.option('--show', is_flag=True, help='Show current AI configuration')
+@click.pass_context
+def config_ai(ctx, enable, primary_service, fallback_service, max_cost, set_api_key, show):
+    """Configure AI categorization settings.
+    
+    Manage AI service configuration, API keys, and cost controls for
+    intelligent transaction categorization.
+    """
+    try:
+        from .categorizers.config_manager import CategorizationConfigManager
+        
+        config_manager = CategorizationConfigManager()
+        
+        if show:
+            # Show AI configuration
+            ai_config = config_manager.get_ai_config()
+            
+            click.echo("🤖 AI Categorization Configuration")
+            click.echo("=" * 40)
+            click.echo(f"Enabled: {ai_config.get('enabled', True)}")
+            click.echo(f"Primary service: {ai_config.get('primary_service', 'openai')}")
+            click.echo(f"Fallback service: {ai_config.get('fallback_service', 'claude')}")
+            click.echo(f"Cache responses: {ai_config.get('cache_responses', True)}")
+            click.echo(f"Max cost per month: ${ai_config.get('max_cost_per_month', 50.0)}")
+            
+            # Check API key status
+            for service in ['openai', 'claude']:
+                api_key = config_manager.get_api_key(service)
+                status = "✓ Configured" if api_key else "✗ Not configured"
+                click.echo(f"{service.title()} API key: {status}")
+            
+            return
+        
+        # Apply configuration changes
+        updates = {}
+        
+        if enable is not None:
+            updates['enabled'] = enable
+        
+        if primary_service:
+            updates['primary_service'] = primary_service
+        
+        if fallback_service:
+            updates['fallback_service'] = fallback_service
+        
+        if max_cost is not None:
+            updates['max_cost_per_month'] = max_cost
+        
+        if set_api_key:
+            # Parse service:key format
+            if ':' not in set_api_key:
+                click.echo("✗ API key format should be 'service:key' (e.g., 'openai:sk-...')")
+                sys.exit(1)
+            
+            service, key = set_api_key.split(':', 1)
+            if service not in ['openai', 'claude']:
+                click.echo(f"✗ Unsupported service: {service}")
+                sys.exit(1)
+            
+            config_manager.set_api_key(service, key, persist=True)
+            click.echo(f"✓ API key set for {service}")
+        
+        if updates:
+            config_manager.update_ai_config(updates)
+            click.echo(f"✓ AI configuration updated: {list(updates.keys())}")
+        
+        if not any([show, enable is not None, primary_service, fallback_service, 
+                   max_cost is not None, set_api_key]):
+            click.echo("Use --help to see available AI configuration options")
+            
+    except Exception as e:
+        click.echo(f"✗ AI configuration error: {str(e)}")
+        sys.exit(1)
+
+
+@cli.command('config-ml')
+@click.option('--enable/--disable', default=None, help='Enable or disable ML categorization')
+@click.option('--model-type', type=click.Choice(['random_forest', 'xgboost', 'naive_bayes']), 
+              help='Set ML model type')
+@click.option('--confidence-threshold', type=float, help='Set ML confidence threshold (0.0-1.0)')
+@click.option('--retrain-threshold', type=int, help='Set retrain threshold (number of new transactions)')
+@click.option('--show', is_flag=True, help='Show current ML configuration')
+@click.pass_context
+def config_ml(ctx, enable, model_type, confidence_threshold, retrain_threshold, show):
+    """Configure ML categorization settings.
+    
+    Manage machine learning model configuration for local transaction
+    categorization and learning from user feedback.
+    """
+    try:
+        from .categorizers.config_manager import CategorizationConfigManager
+        
+        config_manager = CategorizationConfigManager()
+        
+        if show:
+            # Show ML configuration
+            ml_config = config_manager.get_ml_config()
+            
+            click.echo("🧠 ML Categorization Configuration")
+            click.echo("=" * 40)
+            click.echo(f"Enabled: {ml_config.get('enabled', True)}")
+            click.echo(f"Model type: {ml_config.get('model_type', 'random_forest')}")
+            click.echo(f"Confidence threshold: {ml_config.get('confidence_threshold', 0.6)}")
+            click.echo(f"Retrain threshold: {ml_config.get('retrain_threshold', 100)}")
+            click.echo(f"Model path: {ml_config.get('model_path', 'ml_model.pkl')}")
+            
+            # Check if model file exists
+            model_path = ml_config.get('model_path', 'ml_model.pkl')
+            if os.path.exists(model_path):
+                click.echo(f"Model file: ✓ Found ({os.path.getsize(model_path)} bytes)")
+            else:
+                click.echo(f"Model file: ✗ Not found (will be created on first training)")
+            
+            return
+        
+        # Apply configuration changes
+        updates = {}
+        
+        if enable is not None:
+            updates['enabled'] = enable
+        
+        if model_type:
+            updates['model_type'] = model_type
+        
+        if confidence_threshold is not None:
+            if not 0.0 <= confidence_threshold <= 1.0:
+                click.echo("✗ Confidence threshold must be between 0.0 and 1.0")
+                sys.exit(1)
+            updates['confidence_threshold'] = confidence_threshold
+        
+        if retrain_threshold is not None:
+            if retrain_threshold < 1:
+                click.echo("✗ Retrain threshold must be at least 1")
+                sys.exit(1)
+            updates['retrain_threshold'] = retrain_threshold
+        
+        if updates:
+            config_manager.update_ml_config(updates)
+            click.echo(f"✓ ML configuration updated: {list(updates.keys())}")
+        
+        if not any([show, enable is not None, model_type, confidence_threshold is not None, 
+                   retrain_threshold is not None]):
+            click.echo("Use --help to see available ML configuration options")
+            
+    except Exception as e:
+        click.echo(f"✗ ML configuration error: {str(e)}")
+        sys.exit(1)
+
+
+@cli.command('backup-categories')
+@click.option('--create', is_flag=True, help='Create a new backup')
+@click.option('--list', 'list_backups', is_flag=True, help='List available backups')
+@click.option('--restore', help='Restore from backup file')
+@click.option('--cleanup', type=int, help='Clean up backups older than N days')
+@click.pass_context
+def backup_categories(ctx, create, list_backups, restore, cleanup):
+    """Manage category data backups.
+    
+    Create, list, restore, and manage backups of category assignments
+    and configuration data.
+    """
+    try:
+        from .categorizers.config_manager import CategorizationConfigManager
+        from .categorizers.persistence_manager import PersistenceManager
+        
+        config_manager = CategorizationConfigManager()
+        persistence_manager = PersistenceManager()
+        
+        if create:
+            # Create backup
+            config_backup = config_manager.create_backup()
+            data_backup = persistence_manager.create_backup()
+            
+            click.echo("✓ Backups created:")
+            click.echo(f"  Configuration: {config_backup}")
+            click.echo(f"  Category data: {data_backup}")
+        
+        elif list_backups:
+            # List available backups
+            config_backups = config_manager.list_backups()
+            
+            click.echo("📋 Available Configuration Backups:")
+            if config_backups:
+                for backup in config_backups:
+                    size_mb = backup['size_bytes'] / (1024 * 1024)
+                    click.echo(f"  {backup['filename']} - {backup['created_at'].strftime('%Y-%m-%d %H:%M')} ({size_mb:.1f} MB)")
+            else:
+                click.echo("  No configuration backups found")
+            
+            # Show data backup info
+            stats = persistence_manager.get_category_statistics()
+            click.echo(f"\n📊 Current Category Data:")
+            click.echo(f"  Total assignments: {stats.get('total_assignments', 0):,}")
+            click.echo(f"  Total changes: {stats.get('total_changes', 0):,}")
+            click.echo(f"  Recent assignments: {stats.get('recent_assignments', 0):,}")
+        
+        elif restore:
+            # Restore from backup
+            if not os.path.exists(restore):
+                click.echo(f"✗ Backup file not found: {restore}")
+                sys.exit(1)
+            
+            if click.confirm(f"⚠ This will restore configuration from {restore}. Continue?"):
+                config_manager.restore_backup(restore)
+                click.echo("✓ Configuration restored from backup")
+            else:
+                click.echo("Restore cancelled")
+        
+        elif cleanup is not None:
+            # Clean up old backups
+            if cleanup < 1:
+                click.echo("✗ Cleanup days must be at least 1")
+                sys.exit(1)
+            
+            cleaned_count = persistence_manager.cleanup_old_backups(cleanup)
+            click.echo(f"✓ Cleaned up {cleaned_count} old backup files (older than {cleanup} days)")
+        
+        else:
+            # Show help
+            click.echo("Use --help to see available backup options")
+            click.echo("Common commands:")
+            click.echo("  --create            Create new backups")
+            click.echo("  --list              List available backups")
+            click.echo("  --restore file.db   Restore from backup")
+            click.echo("  --cleanup 30        Clean up backups older than 30 days")
+            
+    except Exception as e:
+        click.echo(f"✗ Backup error: {str(e)}")
+        import traceback
+        if ctx.obj.get('verbose'):
+            click.echo(traceback.format_exc())
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     cli()

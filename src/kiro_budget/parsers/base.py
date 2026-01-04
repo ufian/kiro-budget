@@ -179,6 +179,10 @@ class DataTransformer:
         # Remove extra whitespace and normalize
         cleaned = ' '.join(description.split())
         
+        # AmEx-specific cleaning: Remove redundant cardholder name and account info
+        # Pattern: "MIKHAIL OLENIN-21001-ACTUAL DESCRIPTION" -> "ACTUAL DESCRIPTION"
+        cleaned = re.sub(r'^[A-Z\s]+-\d+-', '', cleaned)
+        
         # Remove common prefixes that add noise
         prefixes_to_remove = [
             r'^DEBIT\s+',
